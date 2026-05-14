@@ -1,0 +1,21 @@
+{
+  "saved_at": "2026-05-13T02:51:00.582718",
+  "race_name": "テストレース",
+  "surface": "芝",
+  "distance": 2000,
+  "venue": "東京",
+  "pace_info": {
+    "predicted_pace": "ミドル"
+  },
+  "entries": [],
+  "eval_records": [
+    {
+      "horse_name": "A",
+      "ev": 0.1,
+      "confidence_score": 75,
+      "factor_breakdown": {
+        "EV": 80
+      }
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+﻿# シークレット（絶対にコミットしない）
+.streamlit/secrets.toml
+
+# Kaggle データ（大容量のため除外）
+data/
+
+# SQLite 日記DB（個人データ）
+race_diary.db
+
+# オッズ履歴
+odds_history.json
+
+# セッション保存
+sessions/
+
+# Python キャッシュ
+__pycache__/
+*.pyc
+*.pyo
+
+# 一時ファイル
+*.tmp
+*.log
