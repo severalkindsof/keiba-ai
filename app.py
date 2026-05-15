@@ -513,23 +513,53 @@ with tab_scan:
     with st.expander("🔧 接続テスト（うまく動かない場合）"):
         if st.button("netkeibaへの接続を確認", key="diag_btn"):
             import requests as _req
+            from bs4 import BeautifulSoup as _BS
+            import re as _re
             _diag = st.empty()
-            for _test_date in scan_dates if 'scan_dates' in dir() else weekend_dates:
+            _test_date = weekend_dates[1]  # 日曜
+
+            # ① レース一覧ページ
+            try:
+                _r1 = _req.get(
+                    f"https://race.netkeiba.com/top/race_list_sub.html?kaisai_date={_test_date}",
+                    headers={"User-Agent": "Mozilla/5.0"}, timeout=10,
+                )
+                _soup1 = _BS(_r1.content, "lxml")
+                _links = _soup1.select("a[href*='shutuba.html'][href*='race_id']")
+                _ids = list({_re.search(r"race_id=(\d{12})", a.get("href","")).group(1)
+                             for a in _links if _re.search(r"race_id=(\d{12})", a.get("href",""))})
+                st.success(f"✅ レース一覧：{len(_ids)}件取得")
+            except Exception as _e:
+                st.error(f"❌ レース一覧：失敗 → {_e}")
+                _ids = []
+
+            # ② 出馬表ページ（1レースだけ試す）
+            if _ids:
                 try:
-                    _r = _req.get(
-                        f"https://race.netkeiba.com/top/race_list_sub.html?kaisai_date={_test_date}",
-                        headers={"User-Agent": "Mozilla/5.0"},
-                        timeout=10,
+                    import time as _t
+                    _t.sleep(2)
+                    _r2 = _req.get(
+                        f"https://race.netkeiba.com/race/shutuba.html?race_id={_ids[0]}",
+                        headers={"User-Agent": "Mozilla/5.0"}, timeout=10,
                     )
-                    from bs4 import BeautifulSoup as _BS
-                    import re as _re
-                    _soup = _BS(_r.content, "lxml")
-                    _links = _soup.select("a[href*='shutuba.html'][href*='race_id']")
-                    _ids = list({_re.search(r"race_id=(\d{12})", a.get("href","")).group(1)
-                                 for a in _links if _re.search(r"race_id=(\d{12})", a.get("href",""))})
-                    _diag.success(f"✅ {_test_date}：{len(_ids)}レース確認 (例: {_ids[0] if _ids else 'なし'})")
+                    _soup2 = _BS(_r2.content, "lxml")
+                    _horses = _soup2.select("tr.HorseList")
+                    st.success(f"✅ 出馬表（{_ids[0]}）：{len(_horses)}頭取得")
                 except Exception as _e:
-                    _diag.error(f"❌ {_test_date}：接続失敗 → {_e}")
+                    st.error(f"❌ 出馬表：失敗 → {_e}")
+
+            # ③ オッズAPI
+            if _ids:
+                try:
+                    _t.sleep(2)
+                    _r3 = _req.get(
+                        f"https://race.netkeiba.com/api/api_get_jra_odds.html?race_id={_ids[0]}&type=1&action=update",
+                        headers={"User-Agent": "Mozilla/5.0"}, timeout=10,
+                    )
+                    _d3 = _r3.json()
+                    st.success(f"✅ オッズAPI：status={_d3.get('status')}")
+                except Exception as _e:
+                    st.error(f"❌ オッズAPI：失敗 → {_e}")
 
     if st.button("🚀 全レーススキャン開始", type="primary", use_container_width=True):
         scan_dates = [d.strip() for d in custom_dates.split(",") if d.strip()]
