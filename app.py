@@ -756,20 +756,25 @@ with tab_race:
                 if pd.isna(_last) or pd.Timestamp(_last) < _KAGGLE_CUTOFF:
                     missing.append(_e)
         if missing:
-            with st.spinner(f"🔎 {len(missing)}頭の過去成績をnetkeibaから取得中..."):
-                fetched_count = 0
-                for e in missing:
-                    hid = e["horse_id"]
-                    hname = e["horse_name"]
-                    cached = load_horse_cache(hid)
-                    if cached is not None:
-                        new_df = cached
+            st.info(f"📡 {len(missing)}頭の過去成績をnetkeibaから取得中... (db.netkeiba.com)")
+            _fetch_prog = st.empty()
+            fetched_count = 0
+            fail_count = 0
+            for _fi, e in enumerate(missing):
+                hid = e["horse_id"]
+                hname = e["horse_name"]
+                _fetch_prog.caption(f"取得中 {_fi+1}/{len(missing)}: {hname} (ID:{hid})")
+                cached = load_horse_cache(hid)
+                if cached is not None:
+                    new_df = cached
+                else:
+                    new_df = fetch_horse_past_results(hid, hname)
+                    if not new_df.empty:
+                        save_horse_cache(hid, hname, new_df)
                     else:
-                        new_df = fetch_horse_past_results(hid, hname)
-                        if not new_df.empty:
-                            save_horse_cache(hid, hname, new_df)
-                    if new_df.empty:
-                        continue
+                        fail_count += 1
+                if new_df.empty:
+                    continue
                     # Kaggleデータが既にある馬は2022年以降のみ追加（重複防止）
                     # new_df はnetkeibaの全成績（デビューから現在まで）を含むため
                     if "horse_name" in df_hist.columns:
@@ -783,8 +788,11 @@ with tab_race:
                     if not rows_to_add.empty:
                         df_hist = pd.concat([df_hist, rows_to_add], ignore_index=True)
                         fetched_count += 1
+            _fetch_prog.empty()
             if fetched_count:
                 st.success(f"✅ {fetched_count}頭の過去成績を取得しました（netkeiba）")
+            if fail_count:
+                st.warning(f"⚠️ {fail_count}頭の取得失敗（db.netkeiba.com への接続エラーの可能性）")
                 # 取得データを反映した統計テーブルを再計算（df_hist が変わるのでキャッシュミスになる）
                 win_rate_table = get_win_rate_table(df_hist)
                 sire_stats     = get_sire_stats(df_hist)
