@@ -740,6 +740,8 @@ with tab_race:
         _KAGGLE_CUTOFF = pd.Timestamp("2022-01-01")
         missing = []
         _has_horse_name = not df_hist.empty and "horse_name" in df_hist.columns
+        _horses_with_id = [e for e in entries if e.get("horse_id")]
+        st.caption(f"🔍 デバッグ: 出走馬{len(entries)}頭 / horse_id取得済み{len(_horses_with_id)}頭 / df_hist {len(df_hist)}行 / horse_name列: {_has_horse_name}")
         for _e in entries:
             if not _e.get("horse_id"):
                 continue
