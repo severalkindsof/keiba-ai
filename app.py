@@ -682,8 +682,13 @@ with tab_race:
         # スキャンタブからの引き継ぎ
         preselected = st.session_state.get("preselected_race_id")
 
+        # 今日のレースがなければ週末日付を順に試す
+        _dates_to_try = list(dict.fromkeys([date_str] + get_this_weekend_dates()))
         with st.spinner("レース一覧を取得中..."):
-            races = fetch_today_races(date_str)
+            for _d in _dates_to_try:
+                races = fetch_today_races(_d)
+                if races:
+                    break
         if not races:
             st.warning("レース情報を取得できませんでした。手動入力に切り替えてください。")
             fetch_mode = "✏️ 手動入力"
