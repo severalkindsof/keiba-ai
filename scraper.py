@@ -136,6 +136,8 @@ def fetch_race_entries(race_id: str) -> list[dict]:
 
     # オッズを別ページから補完
     entries = _enrich_odds(race_id, entries)
+    # 空の horse_name エントリを除去（HTML誤パース行）
+    entries = [e for e in entries if e.get("horse_name")]
     return entries
 
 

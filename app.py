@@ -770,7 +770,10 @@ with tab_race:
                         continue
                     # Kaggleデータが既にある馬は2022年以降のみ追加（重複防止）
                     # new_df はnetkeibaの全成績（デビューから現在まで）を含むため
-                    has_kaggle = not df_hist[df_hist["horse_name"] == hname].empty
+                    if "horse_name" in df_hist.columns:
+                        has_kaggle = not df_hist[df_hist["horse_name"] == hname].empty
+                    else:
+                        has_kaggle = False
                     if has_kaggle and "date" in new_df.columns:
                         rows_to_add = new_df[new_df["date"] >= _KAGGLE_CUTOFF]
                     else:
@@ -780,6 +783,10 @@ with tab_race:
                         fetched_count += 1
             if fetched_count:
                 st.success(f"✅ {fetched_count}頭の過去成績を取得しました（netkeiba）")
+                # 取得データを反映した統計テーブルを再計算（df_hist が変わるのでキャッシュミスになる）
+                win_rate_table = get_win_rate_table(df_hist)
+                sire_stats     = get_sire_stats(df_hist)
+                jockey_stats   = get_jockey_stats(df_hist)
     else:
         c1, c2, c3, c4 = st.columns(4)
         with c1:
