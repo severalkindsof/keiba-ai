@@ -36,6 +36,11 @@ def lookup_win_rate(
     条件テーブルから勝率・複勝率を取得。
     見つからない場合は人気帯の全面的な平均にフォールバック。
     """
+    # win_rate_table が空または必要列がない場合は即フォールバック
+    required_cols = {"surface", "distance_cat", "pop_bucket", "win_rate", "place_rate", "races"}
+    if win_rate_table.empty or not required_cols.issubset(win_rate_table.columns):
+        return {"win_rate": np.nan, "place_rate": np.nan, "sample_size": 0}
+
     dist_cat = categorize_distance(distance)
     pop_bucket = _popularity_bucket(popularity)
 
