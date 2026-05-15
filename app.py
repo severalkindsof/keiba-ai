@@ -290,10 +290,11 @@ with tab_home:
 
     weekend = get_this_weekend_dates()
     if st.button("🚀 今日の狙い目を更新", type="primary", use_container_width=True, key="home_scan"):
-        with st.spinner(f"全レースをスキャン中（{'/'.join(weekend)}）..."):
-            home_scan_df = scan_weekend_races(
-                weekend, win_rate_table, sire_stats, jockey_stats, max_races=max_races_home
-            )
+        _home_prog = st.empty()
+        home_scan_df = scan_weekend_races(
+            weekend, win_rate_table, sire_stats, jockey_stats,
+            max_races=max_races_home, progress_placeholder=_home_prog
+        )
         st.session_state["home_scan_df"] = home_scan_df
         if not home_scan_df.empty:
             allocs = allocate_weekend_budget(home_scan_df, weekly_budget_home)
@@ -358,11 +359,11 @@ with tab_home:
             )
 
         if st.button("📋 枠順発表後スキャン開始", type="primary", key="friday_scan"):
-            with st.spinner("土日全レースをスキャン中（枠順込み）..."):
-                fri_scan_df = scan_weekend_races(
-                    get_this_weekend_dates(), win_rate_table, sire_stats,
-                    jockey_stats, max_races=24
-                )
+            _fri_prog = st.empty()
+            fri_scan_df = scan_weekend_races(
+                get_this_weekend_dates(), win_rate_table, sire_stats,
+                jockey_stats, max_races=24, progress_placeholder=_fri_prog
+            )
             st.session_state["friday_scan_df"] = fri_scan_df
             if not fri_scan_df.empty:
                 fri_allocs = allocate_weekend_budget(
@@ -493,10 +494,11 @@ with tab_scan:
 
     if st.button("🚀 全レーススキャン開始", type="primary", use_container_width=True):
         scan_dates = [d.strip() for d in custom_dates.split(",") if d.strip()]
-        with st.spinner(f"スキャン中... 最大{max_races}レース（数分かかります）"):
-            scan_df = scan_weekend_races(
-                scan_dates, win_rate_table, sire_stats, jockey_stats, max_races=max_races
-            )
+        _scan_prog = st.empty()
+        scan_df = scan_weekend_races(
+            scan_dates, win_rate_table, sire_stats, jockey_stats,
+            max_races=max_races, progress_placeholder=_scan_prog
+        )
         st.session_state["scan_df"] = scan_df
 
     if "scan_df" in st.session_state:

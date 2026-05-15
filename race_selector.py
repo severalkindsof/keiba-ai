@@ -14,34 +14,44 @@ from ev_calculator import evaluate_race
 from confluence import get_race_quality_score, add_confluence_to_eval
 
 
-@st.cache_data(ttl=1800)
 def scan_weekend_races(
     dates: list[str],
     win_rate_table: pd.DataFrame,
     sire_stats: pd.DataFrame,
     jockey_stats: pd.DataFrame,
     max_races: int = 30,
+    progress_placeholder=None,
 ) -> pd.DataFrame:
     """
     指定日程の全JRAレースをスキャンして、レース別の狙い目スコアを返す。
-
-    Returns:
-        DataFrame with columns:
-        race_id, race_name, date_str, venue, surface, distance,
-        race_score, top_score, ev_plus_count, verdict, top_horse, top_confidence
+    progress_placeholder: st.empty() を渡すとリアルタイム進捗を表示する。
     """
     all_races = []
     for date_str in dates:
+        if progress_placeholder:
+            progress_placeholder.info(f"📡 {date_str} のレース一覧を取得中...")
         races = fetch_today_races(date_str)
         for r in races:
             r["date_str"] = date_str
         all_races.extend(races)
 
     if not all_races:
+        if progress_placeholder:
+            progress_placeholder.warning("レース情報が取得できませんでした。出走表が公開されていない可能性があります（通常は木曜〜金曜に公開）。")
         return pd.DataFrame()
+
+    total = min(len(all_races), max_races)
+    if progress_placeholder:
+        progress_placeholder.info(f"📋 {total}レースをスキャン開始...")
 
     results = []
     for i, race in enumerate(all_races[:max_races]):
+        if progress_placeholder:
+            pct = int((i + 1) / total * 100)
+            progress_placeholder.info(
+                f"🔍 スキャン中 {i+1}/{total}件 ({pct}%)  \n"
+                f"「{race.get('race_name', '')}」を分析中..."
+            )
         try:
             entries = fetch_race_entries(race["race_id"])
             meta = fetch_race_meta(race["race_id"])
@@ -84,7 +94,12 @@ def scan_weekend_races(
             continue
 
     if not results:
+        if progress_placeholder:
+            progress_placeholder.warning("出走表の取得に失敗しました。出走表が公開前か、通信エラーの可能性があります。")
         return pd.DataFrame()
+
+    if progress_placeholder:
+        progress_placeholder.success(f"✅ スキャン完了！ {len(results)}レースを分析しました")
 
     df = pd.DataFrame(results)
     df = df.sort_values("race_score", ascending=False).reset_index(drop=True)
