@@ -502,6 +502,13 @@ with tab_scan:
     weekend_dates = get_this_weekend_dates()
     st.info(f"スキャン対象：{' / '.join(weekend_dates)}")
 
+    # 起動時・タブ切替時: ファイルキャッシュからスキャン結果を復元
+    if "scan_df" not in st.session_state:
+        _c_df, _c_at, _c_dates = load_scan_result()
+        if not _c_df.empty:
+            st.session_state["scan_df"] = _c_df
+            st.session_state["scan_saved_at"] = _c_at
+
     scan_mode = st.radio(
         "スキャン範囲",
         ["🏆 重賞・9R以降のみ（速い）", "📋 全レース（遅い・36レース）"],
@@ -605,12 +612,19 @@ with tab_scan:
             race_filter=_race_filter, error_container=_scan_err,
         )
         st.session_state["scan_df"] = scan_df
+        if not scan_df.empty:
+            from datetime import datetime as _dt
+            save_scan_result(scan_df, scan_dates)
+            st.session_state["scan_saved_at"] = _dt.now().strftime("%m/%d %H:%M")
 
     if "scan_df" in st.session_state:
         scan_df = st.session_state["scan_df"]
         if scan_df.empty:
             st.warning("スキャン結果が空です。上の「接続テスト」でnetkeibaへの接続を確認してください。")
         else:
+            _saved_at = st.session_state.get("scan_saved_at", "")
+            if _saved_at:
+                st.caption(f"💾 最終スキャン: {_saved_at}（ブラウザを閉じても保持）")
             st.success(f"{len(scan_df)}レースをスキャン完了")
 
             # 上位レース表示
