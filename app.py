@@ -696,7 +696,29 @@ with tab_race:
     entries, surface, distance, track_condition, venue = [], "芝", 2000, "良", "東京"
 
     if fetch_mode == "🌐 netkeibaから自動取得" and races:
-        race_options = {f"{r['race_name']}": r["race_id"] for r in races}
+        # 会場コード→会場名マッピング
+        _VENUE_MAP = {
+            "01":"札幌","02":"函館","03":"福島","04":"新潟","05":"東京",
+            "06":"中山","07":"中京","08":"京都","09":"阪神","10":"小倉",
+        }
+        # レースを会場別グループに分類
+        _venue_groups: dict[str, list] = {}
+        for r in races:
+            _vc = r["race_id"][4:6]
+            _vname = _VENUE_MAP.get(_vc, f"会場{_vc}")
+            _venue_groups.setdefault(_vname, []).append(r)
+
+        # 会場を選んでからレースを選ぶ2段階UI
+        _venue_names = list(_venue_groups.keys())
+        _default_venue_idx = 0
+        if preselected:
+            for vi, (vn, vr) in enumerate(_venue_groups.items()):
+                if any(r["race_id"] == preselected for r in vr):
+                    _default_venue_idx = vi
+                    break
+        selected_venue = st.selectbox("会場を選択", _venue_names, index=_default_venue_idx)
+        _venue_races = _venue_groups[selected_venue]
+        race_options = {f"{r['race_name']}": r["race_id"] for r in _venue_races}
         default_idx = 0
         if preselected and preselected in race_options.values():
             ids = list(race_options.values())
@@ -717,8 +739,12 @@ with tab_race:
         # ② Kaggleにデータはあるが最終成績が2021年以前（現役馬の2022〜2026成績が欠落）
         _KAGGLE_CUTOFF = pd.Timestamp("2022-01-01")
         missing = []
+        _has_horse_name = not df_hist.empty and "horse_name" in df_hist.columns
         for _e in entries:
             if not _e.get("horse_id"):
+                continue
+            if not _has_horse_name:
+                missing.append(_e)
                 continue
             _hist_e = df_hist[df_hist["horse_name"] == _e["horse_name"]]
             if _hist_e.empty:
