@@ -77,6 +77,41 @@ def save_session(
     return str(filename)
 
 
+SCAN_CACHE_FILE = Path(__file__).parent / "saved_sessions" / "_scan_cache.json"
+
+
+def save_scan_result(scan_df: pd.DataFrame, dates: list[str]) -> None:
+    """週末スキャン結果を永続化する"""
+    if scan_df.empty:
+        return
+    SAVE_DIR.mkdir(exist_ok=True)
+    payload = {
+        "saved_at": datetime.now().isoformat(),
+        "dates": dates,
+        "records": scan_df.to_dict(orient="records"),
+    }
+    with open(SCAN_CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2, cls=_Encoder)
+
+
+def load_scan_result() -> tuple[pd.DataFrame, str, list[str]]:
+    """
+    保存済みスキャン結果を読み込む。
+    Returns: (DataFrame, 保存日時文字列, 対象日リスト)
+    """
+    if not SCAN_CACHE_FILE.exists():
+        return pd.DataFrame(), "", []
+    try:
+        with open(SCAN_CACHE_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        df = pd.DataFrame(data.get("records", []))
+        saved_at = data.get("saved_at", "")[:16].replace("T", " ")
+        dates = data.get("dates", [])
+        return df, saved_at, dates
+    except Exception:
+        return pd.DataFrame(), "", []
+
+
 def list_saved_sessions() -> list[dict]:
     """保存済みセッション一覧を返す（新しい順）"""
     files = sorted(SAVE_DIR.glob("*.json"), reverse=True)

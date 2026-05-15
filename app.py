@@ -38,7 +38,7 @@ from rotation_weight import analyze_rotation_for_field
 from confluence import add_confluence_to_eval, get_race_quality_score
 from race_selector import scan_weekend_races, get_this_weekend_dates, format_race_scan_display
 from demo_data import generate_demo_race_results, get_demo_race_entries
-from session_store import save_session, load_session, list_saved_sessions
+from session_store import save_session, load_session, list_saved_sessions, save_scan_result, load_scan_result
 # 新ファクターモジュール
 from position_correction import apply_position_correction
 from weight_handicap import apply_weight_handicap, eval_favorite_reliability
@@ -289,6 +289,14 @@ with tab_home:
         max_races_home = st.number_input("スキャン上限", 5, 40, 20, key="home_max_races")
 
     weekend = get_this_weekend_dates()
+    # 起動時にキャッシュから自動ロード
+    if "home_scan_df" not in st.session_state:
+        _cached_df, _cached_at, _cached_dates = load_scan_result()
+        if not _cached_df.empty:
+            st.session_state["home_scan_df"] = _cached_df
+            st.session_state["home_scan_saved_at"] = _cached_at
+            st.session_state["home_scan_dates"] = _cached_dates
+
     if st.button("🚀 今日の狙い目を更新", type="primary", use_container_width=True, key="home_scan"):
         _home_prog = st.empty()
         home_scan_df = scan_weekend_races(
@@ -297,10 +305,16 @@ with tab_home:
         )
         st.session_state["home_scan_df"] = home_scan_df
         if not home_scan_df.empty:
+            save_scan_result(home_scan_df, weekend)
+            st.session_state["home_scan_saved_at"] = datetime.now().strftime("%m/%d %H:%M")
             allocs = allocate_weekend_budget(home_scan_df, weekly_budget_home)
             st.session_state["home_allocations"] = allocs
 
     scan_df_home = st.session_state.get("home_scan_df", pd.DataFrame())
+    if not scan_df_home.empty:
+        saved_at = st.session_state.get("home_scan_saved_at", "")
+        if saved_at:
+            st.caption(f"💾 最終スキャン: {saved_at}（ブラウザを閉じても保持されます）")
     if not scan_df_home.empty:
         # 閾値フィルター
         filtered = scan_df_home[scan_df_home["race_score"] >= score_threshold]
@@ -366,6 +380,9 @@ with tab_home:
             )
             st.session_state["friday_scan_df"] = fri_scan_df
             if not fri_scan_df.empty:
+                save_scan_result(fri_scan_df, get_this_weekend_dates())
+                st.session_state["home_scan_df"] = fri_scan_df  # ホームタブにも反映
+                st.session_state["home_scan_saved_at"] = datetime.now().strftime("%m/%d %H:%M")
                 fri_allocs = allocate_weekend_budget(
                     fri_scan_df, friday_weekly_budget, max_races=friday_races_limit
                 )
