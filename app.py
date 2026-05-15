@@ -741,7 +741,9 @@ with tab_race:
         missing = []
         _has_horse_name = not df_hist.empty and "horse_name" in df_hist.columns
         _horses_with_id = [e for e in entries if e.get("horse_id")]
+        _actual_cols = list(df_hist.columns[:10]) if not df_hist.empty else []
         st.caption(f"🔍 デバッグ: 出走馬{len(entries)}頭 / horse_id取得済み{len(_horses_with_id)}頭 / df_hist {len(df_hist)}行 / horse_name列: {_has_horse_name}")
+        st.caption(f"🔍 df_hist 最初の10列: {_actual_cols}")
         for _e in entries:
             if not _e.get("horse_id"):
                 continue
