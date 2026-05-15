@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 from datetime import date, timedelta
 
-from scraper import fetch_today_races, fetch_race_entries, fetch_race_meta
+from scraper import fetch_today_races, fetch_race_entries, fetch_race_meta, _get as _scraper_get
 from ev_calculator import evaluate_race
 from confluence import get_race_quality_score, add_confluence_to_eval
 
@@ -26,11 +26,21 @@ def scan_weekend_races(
     指定日程の全JRAレースをスキャンして、レース別の狙い目スコアを返す。
     progress_placeholder: st.empty() を渡すとリアルタイム進捗を表示する。
     """
+    # キャッシュをクリアして強制再取得
+    try:
+        fetch_today_races.clear()
+        fetch_race_entries.clear()
+        fetch_race_meta.clear()
+    except Exception:
+        pass
+
     all_races = []
     for date_str in dates:
         if progress_placeholder:
             progress_placeholder.info(f"📡 {date_str} のレース一覧を取得中...")
         races = fetch_today_races(date_str)
+        if progress_placeholder:
+            progress_placeholder.info(f"📡 {date_str}：{len(races)}レース取得")
         for r in races:
             r["date_str"] = date_str
         all_races.extend(races)
@@ -54,6 +64,8 @@ def scan_weekend_races(
             )
         try:
             entries = fetch_race_entries(race["race_id"])
+            if not entries and progress_placeholder:
+                progress_placeholder.warning(f"⚠️ {race.get('race_name','')} の出馬表取得失敗、スキップ")
             meta = fetch_race_meta(race["race_id"])
             if not entries:
                 continue
