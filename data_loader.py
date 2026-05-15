@@ -12,6 +12,28 @@ from datetime import datetime, timedelta
 DATA_DIR = Path(__file__).parent / "data"
 HORSE_CACHE_DIR = Path(__file__).parent / "sessions" / "horse_cache"
 
+# Google Drive フォルダID（Kaggleデータ置き場）
+GDRIVE_FOLDER_ID = "1g6TvkHtM5Ubs8HjC3JeeKM2Y5IDzxwjR"
+
+def _download_from_gdrive():
+    """Google DriveからKaggle CSVを自動ダウンロードする（初回のみ）"""
+    DATA_DIR.mkdir(exist_ok=True)
+    target = DATA_DIR / "19860105-20210731_race_result.csv"
+    if target.exists():
+        return  # 既にある場合はスキップ
+
+    try:
+        import gdown
+        st.info("📥 過去データをGoogle Driveからダウンロード中...（初回のみ、数分かかります）")
+        gdown.download_folder(
+            f"https://drive.google.com/drive/folders/{GDRIVE_FOLDER_ID}",
+            output=str(DATA_DIR),
+            quiet=False,
+        )
+        st.success("✅ ダウンロード完了！")
+    except Exception as e:
+        st.warning(f"自動ダウンロード失敗: {e}")
+
 # 距離カテゴリ
 def categorize_distance(dist):
     if dist <= 1400:
@@ -25,10 +47,13 @@ def categorize_distance(dist):
 
 @st.cache_data(ttl=3600)
 def load_race_results() -> pd.DataFrame:
-    """レース結果CSVを読み込む（race_results.csv または results.csv）"""
+    """レース結果CSVを読み込む（なければGoogle Driveから自動DL）"""
     candidates = list(DATA_DIR.glob("*.csv"))
     if not candidates:
-        st.error("data/ フォルダにCSVファイルが見つかりません。SETUP.md の STEP 3 を参照してください。")
+        _download_from_gdrive()
+        candidates = list(DATA_DIR.glob("*.csv"))
+    if not candidates:
+        st.error("データの取得に失敗しました。デモモードをお試しください。")
         return pd.DataFrame()
 
     # Kaggleデータセットのファイル名候補
