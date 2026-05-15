@@ -101,7 +101,9 @@ def fetch_race_entries(race_id: str) -> list[dict]:
     entries = []
     for row in soup.select("tr.HorseList"):
         try:
-            horse_no = _text(row, ".Umaban")
+            # Umaban1〜Umaban18 に対応
+            umaban_el = row.select_one("[class*='Umaban']")
+            horse_no = umaban_el.get_text(strip=True) if umaban_el else ""
             horse_name = _text(row, ".HorseName")
             jockey = _text(row, ".Jockey")
             weight_carried = _text(row, ".Txt_C")
@@ -138,29 +140,75 @@ def fetch_race_entries(race_id: str) -> list[dict]:
 
 
 def _enrich_odds(race_id: str, entries: list[dict]) -> list[dict]:
-    """単勝・複勝オッズページから人気・オッズを補完する"""
-    url = f"https://odds.netkeiba.com/odds/odds_tanpuku_block.html?race_id={race_id}"
+    """race.netkeiba.com の APIから単勝オッズ・人気を取得する"""
+    import json as _json
+    url = f"https://race.netkeiba.com/api/api_get_jra_odds.html?race_id={race_id}&type=1&action=update"
+    try:
+        time.sleep(REQUEST_INTERVAL)
+        r = requests.get(url, headers=HEADERS, timeout=10)
+        data = r.json()
+    except Exception:
+        # JSONでなければフォールバック（odds/index.htmlから取得）
+        return _enrich_odds_fallback(race_id, entries)
+
+    if data.get("status") not in ("middle", "fixed"):
+        return _enrich_odds_fallback(race_id, entries)
+
+    # APIレスポンスのパース
+    # odds = {"1": {"01": ["オッズ", "", "人気順位"], "02": [...], ...}}
+    try:
+        odds_dict = data["data"].get("odds", {})
+        tansho = odds_dict.get("1", {})  # type=1 が単勝
+
+        for e in entries:
+            umaban = str(e.get("horse_no", "")).zfill(2)
+            row = tansho.get(umaban)
+            if row and len(row) >= 1:
+                try:
+                    e["odds"] = float(row[0]) if row[0] and row[0] != "---" else 10.0
+                except Exception:
+                    e["odds"] = 10.0
+                try:
+                    e["popularity"] = int(row[2]) if len(row) >= 3 and row[2] else 9
+                except Exception:
+                    e["popularity"] = 9
+            else:
+                e.setdefault("odds", 10.0)
+                e.setdefault("popularity", 9)
+    except Exception:
+        return _enrich_odds_fallback(race_id, entries)
+
+    return entries
+
+
+def _enrich_odds_fallback(race_id: str, entries: list[dict]) -> list[dict]:
+    """フォールバック: odds/index.html から単勝オッズをスクレイピング"""
+    url = f"https://race.netkeiba.com/odds/index.html?race_id={race_id}&type=1"
     soup = _get(url)
     if soup is None:
+        for e in entries:
+            e.setdefault("odds", 10.0)
+            e.setdefault("popularity", 9)
         return entries
 
     odds_map = {}
-    for row in soup.select("tr"):
+    for row in soup.select("tr.HorseList, tr[id^='tr_']"):
         tds = row.find_all("td")
-        if len(tds) >= 4:
+        if len(tds) >= 3:
             try:
                 umaban = tds[0].get_text(strip=True)
-                odds_val = float(tds[2].get_text(strip=True).replace(",", ""))
-                ninki = int(tds[3].get_text(strip=True))
-                odds_map[umaban] = {"odds": odds_val, "popularity": ninki}
+                odds_val = float(tds[-2].get_text(strip=True).replace(",", "").replace("---", "10"))
+                ninki_text = tds[-1].get_text(strip=True) if len(tds) > 2 else "9"
+                ninki = int(re.sub(r"\D", "", ninki_text) or "9")
+                if umaban.isdigit():
+                    odds_map[umaban] = {"odds": odds_val, "popularity": ninki}
             except Exception:
                 continue
 
     for e in entries:
-        info = odds_map.get(e.get("horse_no", ""), {})
-        e["odds"] = info.get("odds", 10.0)
+        info = odds_map.get(str(e.get("horse_no", "")), {})
+        e["odds"]       = info.get("odds", 10.0)
         e["popularity"] = info.get("popularity", 9)
-
     return entries
 
 
