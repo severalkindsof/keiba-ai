@@ -500,6 +500,12 @@ with tab_scan:
     weekend_dates = get_this_weekend_dates()
     st.info(f"スキャン対象：{' / '.join(weekend_dates)}")
 
+    scan_mode = st.radio(
+        "スキャン範囲",
+        ["🏆 重賞・9R以降のみ（速い）", "📋 全レース（遅い・36レース）"],
+        horizontal=True,
+    )
+
     col_l, col_r = st.columns([2, 1])
     with col_l:
         custom_dates = st.text_input(
@@ -507,7 +513,8 @@ with tab_scan:
             value=",".join(weekend_dates),
         )
     with col_r:
-        max_races = st.number_input("スキャン上限レース数", min_value=5, max_value=50, value=20)
+        max_races = st.number_input("スキャン上限レース数", min_value=3, max_value=50,
+                                    value=10 if "重賞" in scan_mode else 24)
 
     # 接続診断ボタン
     with st.expander("🔧 接続テスト（うまく動かない場合）"):
@@ -573,14 +580,26 @@ with tab_scan:
                 except Exception as _e:
                     st.error(f"❌ fetch_race_entries：例外発生 → {_e}")
 
-    if st.button("🚀 全レーススキャン開始", type="primary", use_container_width=True):
+    if st.button("🚀 スキャン開始", type="primary", use_container_width=True):
         scan_dates = [d.strip() for d in custom_dates.split(",") if d.strip()]
-        # キャッシュをクリアして強制再取得
         fetch_today_races.clear()
+        fetch_race_entries.clear()
         _scan_prog = st.empty()
+
+        # 重賞モードの場合は後半レース(9R以降)に相当するIDのみ対象
+        _race_filter = None
+        if "重賞" in scan_mode:
+            # netkeibaのrace_idはYYYYVVRRNN形式。NN(レース番号)が09以上 = 9R以降
+            def _race_filter(r):
+                try:
+                    return int(r["race_id"][-2:]) >= 9
+                except Exception:
+                    return True
+
         scan_df = scan_weekend_races(
             scan_dates, win_rate_table, sire_stats, jockey_stats,
-            max_races=max_races, progress_placeholder=_scan_prog
+            max_races=max_races, progress_placeholder=_scan_prog,
+            race_filter=_race_filter,
         )
         st.session_state["scan_df"] = scan_df
 

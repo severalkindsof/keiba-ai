@@ -21,6 +21,7 @@ def scan_weekend_races(
     jockey_stats: pd.DataFrame,
     max_races: int = 30,
     progress_placeholder=None,
+    race_filter=None,
 ) -> pd.DataFrame:
     """
     指定日程の全JRAレースをスキャンして、レース別の狙い目スコアを返す。
@@ -50,6 +51,12 @@ def scan_weekend_races(
             progress_placeholder.warning("レース情報が取得できませんでした。出走表が公開されていない可能性があります（通常は木曜〜金曜に公開）。")
         return pd.DataFrame()
 
+    # フィルター適用（重賞モードなど）
+    if race_filter:
+        all_races = [r for r in all_races if race_filter(r)]
+        if progress_placeholder:
+            progress_placeholder.info(f"🔽 フィルター後：{len(all_races)}レース対象")
+
     total = min(len(all_races), max_races)
     if progress_placeholder:
         progress_placeholder.info(f"📋 {total}レースをスキャン開始...")
@@ -64,12 +71,11 @@ def scan_weekend_races(
             )
         try:
             entries = fetch_race_entries(race["race_id"])
-            if not entries and progress_placeholder:
-                progress_placeholder.warning(f"⚠️ {race.get('race_name','')} の出馬表取得失敗、スキップ")
-            meta = fetch_race_meta(race["race_id"])
             if not entries:
+                if progress_placeholder:
+                    progress_placeholder.warning(f"⚠️ {race.get('race_name','')} 出馬表0件")
                 continue
-
+            meta = fetch_race_meta(race["race_id"])
             surface = meta.get("surface", "芝")
             distance = meta.get("distance", 2000)
             condition = meta.get("track_condition", "良")
@@ -102,7 +108,9 @@ def scan_weekend_races(
                 "top_confidence": top_row.get("confidence_score", 0),
                 "top_ev": top_row.get("ev", float("nan")),
             })
-        except Exception:
+        except Exception as _err:
+            if progress_placeholder:
+                progress_placeholder.warning(f"⚠️ {race.get('race_name','')} エラー: {str(_err)[:80]}")
             continue
 
     if not results:
