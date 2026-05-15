@@ -299,9 +299,11 @@ with tab_home:
 
     if st.button("🚀 今日の狙い目を更新", type="primary", use_container_width=True, key="home_scan"):
         _home_prog = st.empty()
+        _home_err = st.container()
         home_scan_df = scan_weekend_races(
             weekend, win_rate_table, sire_stats, jockey_stats,
-            max_races=max_races_home, progress_placeholder=_home_prog
+            max_races=max_races_home, progress_placeholder=_home_prog,
+            error_container=_home_err,
         )
         st.session_state["home_scan_df"] = home_scan_df
         if not home_scan_df.empty:
@@ -585,6 +587,7 @@ with tab_scan:
         fetch_today_races.clear()
         fetch_race_entries.clear()
         _scan_prog = st.empty()
+        _scan_err = st.container()  # エラー詳細専用（上書きされない）
 
         # 重賞モードの場合は後半レース(9R以降)に相当するIDのみ対象
         _race_filter = None
@@ -599,7 +602,7 @@ with tab_scan:
         scan_df = scan_weekend_races(
             scan_dates, win_rate_table, sire_stats, jockey_stats,
             max_races=max_races, progress_placeholder=_scan_prog,
-            race_filter=_race_filter,
+            race_filter=_race_filter, error_container=_scan_err,
         )
         st.session_state["scan_df"] = scan_df
 

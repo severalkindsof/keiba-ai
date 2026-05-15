@@ -41,7 +41,7 @@ def _get(url: str) -> BeautifulSoup | None:
         resp.encoding = resp.apparent_encoding
         return BeautifulSoup(resp.text, "lxml")
     except Exception as e:
-        st.warning(f"スクレイピング失敗: {url}\n{e}")
+        print(f"[scraper] 失敗: {url}: {e}")
         return None
 
 
@@ -126,8 +126,8 @@ def fetch_race_entries(race_id: str) -> list[dict]:
                 "jockey": jockey,
                 "weight_carried": weight_carried,
                 "gate": gate,
-                "popularity": None,
-                "odds": None,
+                "popularity": 9,
+                "odds": 10.0,
                 "sire": "",
                 "horse_id": horse_id,
             })
@@ -173,8 +173,8 @@ def _enrich_odds(race_id: str, entries: list[dict]) -> list[dict]:
                 except Exception:
                     e["popularity"] = 9
             else:
-                e.setdefault("odds", 10.0)
-                e.setdefault("popularity", 9)
+                if e.get("odds") is None:       e["odds"] = 10.0
+                if e.get("popularity") is None: e["popularity"] = 9
     except Exception:
         return _enrich_odds_fallback(race_id, entries)
 
@@ -226,6 +226,7 @@ def fetch_horse_sire(horse_id: str) -> str:
         return ""
 
 
+@st.cache_data(ttl=900)
 def fetch_race_meta(race_id: str) -> dict:
     """
     レースのメタ情報（距離・馬場・馬場状態・会場）を取得する

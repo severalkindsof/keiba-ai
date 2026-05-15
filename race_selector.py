@@ -22,10 +22,12 @@ def scan_weekend_races(
     max_races: int = 30,
     progress_placeholder=None,
     race_filter=None,
+    error_container=None,
 ) -> pd.DataFrame:
     """
     指定日程の全JRAレースをスキャンして、レース別の狙い目スコアを返す。
     progress_placeholder: st.empty() を渡すとリアルタイム進捗を表示する。
+    error_container: st.container() を渡すとエラー詳細を上書きせず表示する。
     """
     # キャッシュをクリアして強制再取得
     try:
@@ -118,19 +120,26 @@ def scan_weekend_races(
             error_log.append(f"❌ {race_name}: {type(_err).__name__}: {str(_err)[:120]}\n{tb}")
             continue
 
-    # スキップ・エラーを progress_placeholder に表示
-    if progress_placeholder and (error_log or skip_log):
-        summary_lines = []
-        if skip_log:
-            summary_lines.append(f"⚠️ スキップ {len(skip_log)}件: " + " / ".join(skip_log[:5]))
+    # エラー・スキップを error_container（消えないコンテナ）に表示
+    _err_target = error_container or progress_placeholder
+    if _err_target and (error_log or skip_log):
+        lines = []
         if error_log:
-            summary_lines.append("--- エラー詳細 ---")
-            summary_lines.extend(error_log[:5])  # 最大5件
-        progress_placeholder.warning("\n".join(summary_lines))
+            lines.append(f"**❌ 例外エラー {len(error_log)}件:**")
+            lines.extend(error_log[:8])
+        if skip_log:
+            lines.append(f"**⚠️ スキップ {len(skip_log)}件:**")
+            lines.extend(skip_log[:8])
+        _err_target.warning("\n\n".join(lines))
 
     if not results:
+        msg = (
+            f"スキャン結果が0件でした。"
+            f"（取得レース数: {len(all_races[:max_races])}件 / エラー: {len(error_log)}件 / 出馬表0件スキップ: {len(skip_log)}件）\n"
+            "上の黄色ボックスにエラー詳細が表示されている場合は内容を確認してください。"
+        )
         if progress_placeholder:
-            progress_placeholder.warning("出走表の取得に失敗しました。出走表が公開前か、通信エラーの可能性があります。")
+            progress_placeholder.warning(msg)
         return pd.DataFrame()
 
     if progress_placeholder:

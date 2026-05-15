@@ -143,10 +143,10 @@ def evaluate_horse(
         place_odds
     """
     surface = horse.get("surface", "芝")
-    distance = int(horse.get("distance", 2000))
-    popularity = int(horse.get("popularity", 9))
-    odds = float(horse.get("odds", 10.0))
-    place_odds = float(horse.get("place_odds", odds / 3))
+    distance = int(horse.get("distance") or 2000)
+    popularity = int(horse.get("popularity") or 9)
+    odds = float(horse.get("odds") or 10.0)
+    place_odds = float(horse.get("place_odds") or (odds / 3))
     jockey = horse.get("jockey", "")
     sire = horse.get("sire", "")
     condition = horse.get("track_condition", "良")
