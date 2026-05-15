@@ -55,26 +55,30 @@ def fetch_today_races(target_date: str | None = None) -> list[dict]:
     if target_date is None:
         target_date = date.today().strftime("%Y%m%d")
 
-    url = f"https://race.netkeiba.com/top/race_list.html?kaisai_date={target_date}"
+    # race_list_sub.html を使用（race_list.htmlはJS動的生成に変更されたため）
+    url = f"https://race.netkeiba.com/top/race_list_sub.html?kaisai_date={target_date}"
     soup = _get(url)
     if soup is None:
         return []
 
-    # JRA会場コードは01〜10。race_idの3〜4文字目が会場コード。
-    # 地方競馬（NAR）は11以上なので除外する。
     JRA_VENUE_CODES = {str(i).zfill(2) for i in range(1, 11)}
 
+    seen = set()
     races = []
-    for a in soup.select("a[href*='/race/result.html']"):
+    # shutuba.html?race_id=... のリンクを取得（重複除外）
+    for a in soup.select("a[href*='shutuba.html'][href*='race_id']"):
         href = a.get("href", "")
         m = re.search(r"race_id=(\d{12})", href)
         if not m:
             continue
         race_id = m.group(1)
-        venue_code = race_id[4:6]  # YYYYVVRRNN形式のVV部分
+        if race_id in seen:
+            continue
+        seen.add(race_id)
+        venue_code = race_id[4:6]
         if venue_code not in JRA_VENUE_CODES:
             continue  # 地方競馬をスキップ
-        name = a.get_text(strip=True)
+        name = a.get_text(strip=True).split("\n")[0].strip()
         races.append({
             "race_id": race_id,
             "race_name": name,
