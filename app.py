@@ -561,6 +561,18 @@ with tab_scan:
                 except Exception as _e:
                     st.error(f"❌ オッズAPI：失敗 → {_e}")
 
+            # ④ fetch_race_entries（実際のスキャンで使う関数）を直接テスト
+            if _ids:
+                try:
+                    fetch_race_entries.clear()
+                    _entries = fetch_race_entries(_ids[0])
+                    if _entries:
+                        st.success(f"✅ fetch_race_entries：{len(_entries)}頭取得 (オッズ例: {_entries[0].get('odds')})")
+                    else:
+                        st.error(f"❌ fetch_race_entries：0件（ここが原因）")
+                except Exception as _e:
+                    st.error(f"❌ fetch_race_entries：例外発生 → {_e}")
+
     if st.button("🚀 全レーススキャン開始", type="primary", use_container_width=True):
         scan_dates = [d.strip() for d in custom_dates.split(",") if d.strip()]
         # キャッシュをクリアして強制再取得
