@@ -62,18 +62,21 @@ def scan_weekend_races(
         progress_placeholder.info(f"📋 {total}レースをスキャン開始...")
 
     results = []
+    error_log = []  # エラーを蓄積してまとめて表示
+    skip_log = []   # 0件・空DataFrameをスキップしたレースも記録
+
     for i, race in enumerate(all_races[:max_races]):
+        race_name = race.get("race_name", race.get("race_id", "?"))
         if progress_placeholder:
             pct = int((i + 1) / total * 100)
             progress_placeholder.info(
                 f"🔍 スキャン中 {i+1}/{total}件 ({pct}%)  \n"
-                f"「{race.get('race_name', '')}」を分析中..."
+                f"「{race_name}」を分析中..."
             )
         try:
             entries = fetch_race_entries(race["race_id"])
             if not entries:
-                if progress_placeholder:
-                    progress_placeholder.warning(f"⚠️ {race.get('race_name','')} 出馬表0件")
+                skip_log.append(f"{race_name}: 出馬表0件")
                 continue
             meta = fetch_race_meta(race["race_id"])
             surface = meta.get("surface", "芝")
@@ -87,6 +90,7 @@ def scan_weekend_races(
 
             eval_df = evaluate_race(entries, win_rate_table, sire_stats, jockey_stats)
             if eval_df.empty:
+                skip_log.append(f"{race_name}: evaluate_race が空を返した（距離={distance}, 馬場={surface}）")
                 continue
 
             scored = add_confluence_to_eval(eval_df)
@@ -109,9 +113,20 @@ def scan_weekend_races(
                 "top_ev": top_row.get("ev", float("nan")),
             })
         except Exception as _err:
-            if progress_placeholder:
-                progress_placeholder.warning(f"⚠️ {race.get('race_name','')} エラー: {str(_err)[:80]}")
+            import traceback
+            tb = traceback.format_exc()[-300:]  # 末尾300文字
+            error_log.append(f"❌ {race_name}: {type(_err).__name__}: {str(_err)[:120]}\n{tb}")
             continue
+
+    # スキップ・エラーを progress_placeholder に表示
+    if progress_placeholder and (error_log or skip_log):
+        summary_lines = []
+        if skip_log:
+            summary_lines.append(f"⚠️ スキップ {len(skip_log)}件: " + " / ".join(skip_log[:5]))
+        if error_log:
+            summary_lines.append("--- エラー詳細 ---")
+            summary_lines.extend(error_log[:5])  # 最大5件
+        progress_placeholder.warning("\n".join(summary_lines))
 
     if not results:
         if progress_placeholder:
