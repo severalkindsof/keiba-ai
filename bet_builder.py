@@ -53,11 +53,19 @@ def select_axis_horses(
         return {}
 
     df = eval_df.copy()
-    df["ev"]           = pd.to_numeric(df.get("ev",           0), errors="coerce").fillna(-0.5)
-    df["popularity"]   = pd.to_numeric(df.get("popularity",   9), errors="coerce").fillna(9)
-    df["odds"]         = pd.to_numeric(df.get("odds",        10), errors="coerce").fillna(10)
-    df["bias_bonus"]   = pd.to_numeric(df.get("realtime_bias_bonus", 0), errors="coerce").fillna(0)
-    df["conf_score"]   = pd.to_numeric(df.get("confidence_score", 50), errors="coerce").fillna(50)
+
+    def _col(df, name, default):
+        """列が存在しない場合はデフォルト値で埋めたSeriesを返す"""
+        return pd.to_numeric(
+            df[name] if name in df.columns else default,
+            errors="coerce"
+        ).fillna(default)
+
+    df["ev"]           = _col(df, "ev",                   -0.5)
+    df["popularity"]   = _col(df, "popularity",             9)
+    df["odds"]         = _col(df, "odds",                  10)
+    df["bias_bonus"]   = _col(df, "realtime_bias_bonus",    0)
+    df["conf_score"]   = _col(df, "confidence_score",      50)
 
     # バイアス補正スコアで並べ替え
     df["selection_score"] = df["ev"] * 10 + df["conf_score"] / 100 + df["bias_bonus"] * 5
