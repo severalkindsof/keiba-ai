@@ -509,8 +509,32 @@ with tab_scan:
     with col_r:
         max_races = st.number_input("スキャン上限レース数", min_value=5, max_value=50, value=20)
 
+    # 接続診断ボタン
+    with st.expander("🔧 接続テスト（うまく動かない場合）"):
+        if st.button("netkeibaへの接続を確認", key="diag_btn"):
+            import requests as _req
+            _diag = st.empty()
+            for _test_date in scan_dates if 'scan_dates' in dir() else weekend_dates:
+                try:
+                    _r = _req.get(
+                        f"https://race.netkeiba.com/top/race_list_sub.html?kaisai_date={_test_date}",
+                        headers={"User-Agent": "Mozilla/5.0"},
+                        timeout=10,
+                    )
+                    from bs4 import BeautifulSoup as _BS
+                    import re as _re
+                    _soup = _BS(_r.content, "lxml")
+                    _links = _soup.select("a[href*='shutuba.html'][href*='race_id']")
+                    _ids = list({_re.search(r"race_id=(\d{12})", a.get("href","")).group(1)
+                                 for a in _links if _re.search(r"race_id=(\d{12})", a.get("href",""))})
+                    _diag.success(f"✅ {_test_date}：{len(_ids)}レース確認 (例: {_ids[0] if _ids else 'なし'})")
+                except Exception as _e:
+                    _diag.error(f"❌ {_test_date}：接続失敗 → {_e}")
+
     if st.button("🚀 全レーススキャン開始", type="primary", use_container_width=True):
         scan_dates = [d.strip() for d in custom_dates.split(",") if d.strip()]
+        # キャッシュをクリアして強制再取得
+        fetch_today_races.clear()
         _scan_prog = st.empty()
         scan_df = scan_weekend_races(
             scan_dates, win_rate_table, sire_stats, jockey_stats,
@@ -521,7 +545,7 @@ with tab_scan:
     if "scan_df" in st.session_state:
         scan_df = st.session_state["scan_df"]
         if scan_df.empty:
-            st.warning("スキャン結果が空です。手動入力モードでレースを個別に分析してください。")
+            st.warning("スキャン結果が空です。上の「接続テスト」でnetkeibaへの接続を確認してください。")
         else:
             st.success(f"{len(scan_df)}レースをスキャン完了")
 
