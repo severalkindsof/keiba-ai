@@ -165,6 +165,11 @@ with st.sidebar:
         draw_table      = build_dynamic_draw_table(df_hist)
         nicks_table     = build_nicks_table(df_hist)
         race_level_table = build_race_level_table(df_hist)
+    # 統計テーブルの状態をサイドバーに表示（デバッグ用）
+    if win_rate_table.empty:
+        st.sidebar.warning("⚠️ 勝率テーブル未構築（列マッピング要確認）")
+    else:
+        st.sidebar.caption(f"📊 勝率テーブル: {len(win_rate_table)}行")
 
     st.divider()
     st.subheader("💾 前日セッション引継ぎ")
@@ -511,8 +516,9 @@ with tab_scan:
 
     scan_mode = st.radio(
         "スキャン範囲",
-        ["🏆 重賞・9R以降のみ（速い）", "📋 全レース（遅い・36レース）"],
+        ["🏆 9R以降のみ（推奨・速い）", "📋 全レース（遅い）"],
         horizontal=True,
+        index=0,  # 9R以降をデフォルト
     )
 
     col_l, col_r = st.columns([2, 1])
@@ -523,7 +529,7 @@ with tab_scan:
         )
     with col_r:
         max_races = st.number_input("スキャン上限レース数", min_value=3, max_value=50,
-                                    value=10 if "重賞" in scan_mode else 24)
+                                    value=10 if "9R" in scan_mode else 24)
 
     # 接続診断ボタン
     with st.expander("🔧 接続テスト（うまく動かない場合）"):
@@ -598,7 +604,7 @@ with tab_scan:
 
         # 重賞モードの場合は後半レース(9R以降)に相当するIDのみ対象
         _race_filter = None
-        if "重賞" in scan_mode:
+        if "9R" in scan_mode:
             # netkeibaのrace_idはYYYYVVRRNN形式。NN(レース番号)が09以上 = 9R以降
             def _race_filter(r):
                 try:
@@ -734,61 +740,8 @@ with tab_race:
         track_condition = meta.get("track_condition", "良")
         st.info(f"**{surface} {distance}m / 馬場: {track_condition}**")
 
-        # Kaggleデータが欠落している馬の過去成績を自動取得
-        # ① 完全にデータなし（2022年以降デビュー馬）
-        # ② Kaggleにデータはあるが最終成績が2021年以前（現役馬の2022〜2026成績が欠落）
-        _KAGGLE_CUTOFF = pd.Timestamp("2022-01-01")
-        missing = []
-        _has_horse_name = not df_hist.empty and "horse_name" in df_hist.columns
-        for _e in entries:
-            if not _e.get("horse_id"):
-                continue
-            if not _has_horse_name:
-                missing.append(_e)
-                continue
-            _hist_e = df_hist[df_hist["horse_name"] == _e["horse_name"]]
-            if _hist_e.empty:
-                missing.append(_e)
-            elif "date" in _hist_e.columns:
-                _last = _hist_e["date"].max()
-                if pd.isna(_last) or pd.Timestamp(_last) < _KAGGLE_CUTOFF:
-                    missing.append(_e)
-        if missing:
-            st.info(f"📡 {len(missing)}頭の最新成績をnetkeibaから補完中...")
-            _fetch_prog = st.empty()
-            fetched_count = 0
-            fail_count = 0
-            for _fi, e in enumerate(missing):
-                hid = e["horse_id"]
-                hname = e["horse_name"]
-                _fetch_prog.caption(f"取得中 {_fi+1}/{len(missing)}: {hname} (ID:{hid})")
-                cached = load_horse_cache(hid)
-                if cached is not None:
-                    new_df = cached
-                else:
-                    new_df = fetch_horse_past_results(hid, hname)
-                    if not new_df.empty:
-                        save_horse_cache(hid, hname, new_df)
-                    else:
-                        fail_count += 1
-                if new_df.empty:
-                    continue
-                    # Kaggleデータが既にある馬は2022年以降のみ追加（重複防止）
-                    # new_df はnetkeibaの全成績（デビューから現在まで）を含むため
-                    if "horse_name" in df_hist.columns:
-                        has_kaggle = not df_hist[df_hist["horse_name"] == hname].empty
-                    else:
-                        has_kaggle = False
-                    if has_kaggle and "date" in new_df.columns:
-                        rows_to_add = new_df[new_df["date"] >= _KAGGLE_CUTOFF]
-                    else:
-                        rows_to_add = new_df
-                    if not rows_to_add.empty:
-                        df_hist = pd.concat([df_hist, rows_to_add], ignore_index=True)
-                        fetched_count += 1
-            _fetch_prog.empty()
-            if fetched_count:
-                st.success(f"✅ {fetched_count}頭の最新成績を取得しました")
+        # 注: db.netkeiba.com はStreamlit Cloudでブロックされているため個別馬取得は無効
+        # 分析はKaggleの1986-2021統計データ(勝率/枠/騎手)をベースに実施
                 # 取得データを反映した統計テーブルを再計算（df_hist が変わるのでキャッシュミスになる）
                 win_rate_table = get_win_rate_table(df_hist)
                 sire_stats     = get_sire_stats(df_hist)
