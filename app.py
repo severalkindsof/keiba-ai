@@ -742,10 +742,6 @@ with tab_race:
 
         # 注: db.netkeiba.com はStreamlit Cloudでブロックされているため個別馬取得は無効
         # 分析はKaggleの1986-2021統計データ(勝率/枠/騎手)をベースに実施
-                # 取得データを反映した統計テーブルを再計算（df_hist が変わるのでキャッシュミスになる）
-                win_rate_table = get_win_rate_table(df_hist)
-                sire_stats     = get_sire_stats(df_hist)
-                jockey_stats   = get_jockey_stats(df_hist)
     else:
         c1, c2, c3, c4 = st.columns(4)
         with c1:
