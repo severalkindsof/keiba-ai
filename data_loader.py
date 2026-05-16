@@ -75,9 +75,40 @@ def load_race_results() -> pd.DataFrame:
 
 
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """列名を統一する（英語・日本語どちらにも対応）"""
-    rename_map = {
-        # 日本語列名 → 統一英語名
+    """列名を統一する（Kaggle JRA CSV・netkeiba両対応）"""
+    # Kaggle JRA Dataset の正確な列名を優先マッピング
+    # 実際の列名: 芝・ダート区分, 上り, 距離(m), 馬場状態1, 競馬場名, レース日付 など
+    exact_map = {
+        "芝・ダート区分":  "surface",
+        "芝・ダート区分2": "surface_alt",
+        "距離(m)":        "distance",
+        "上り":           "last_3f",
+        "馬場状態1":      "track_condition",
+        "馬場状態2":      "track_condition2",
+        "競馬場名":       "venue",
+        "レース日付":     "date",
+        "競争条件":       "race_class",
+        "4コーナー":      "corner_order",
+        "着順":           "rank",
+        "馬名":           "horse_name",
+        "枠番":           "gate",
+        "馬番":           "horse_no",
+        "斤量":           "weight_carried",
+        "騎手":           "jockey",
+        "タイム":         "time",
+        "着差":           "margin",
+        "単勝":           "odds",
+        "人気":           "popularity",
+        "馬体重":         "horse_weight",
+        "場体重増減":     "weight_change",
+        "調教師":         "trainer",
+        "レース名":       "race_name",
+    }
+    # 完全一致マッピングを先に適用
+    df = df.rename(columns={k: v for k, v in exact_map.items() if k in df.columns and v not in df.columns})
+
+    # 部分一致フォールバック（netkeiba scraped data など）
+    partial_map = {
         "着順": "rank",
         "馬名": "horse_name",
         "性齢": "sex_age",
@@ -106,12 +137,17 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
         "前走クラス": "prev_class",
         "クラス名": "race_class",
     }
-    # 部分一致でも対応
     cols = df.columns.tolist()
-    for old, new in rename_map.items():
+    for old, new in partial_map.items():
         matched = [c for c in cols if old in c]
         if matched and new not in df.columns:
             df = df.rename(columns={matched[0]: new})
+
+    # surface の値を正規化（"ダ" → "ダート"）
+    if "surface" in df.columns:
+        df["surface"] = df["surface"].astype(str).str.strip()
+        df["surface"] = df["surface"].replace({"ダ": "ダート", "D": "ダート", "T": "芝", "1": "芝", "2": "ダート"})
+
     return df
 
 

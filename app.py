@@ -740,10 +740,6 @@ with tab_race:
         _KAGGLE_CUTOFF = pd.Timestamp("2022-01-01")
         missing = []
         _has_horse_name = not df_hist.empty and "horse_name" in df_hist.columns
-        _horses_with_id = [e for e in entries if e.get("horse_id")]
-        _actual_cols = list(df_hist.columns[:10]) if not df_hist.empty else []
-        st.caption(f"🔍 デバッグ: 出走馬{len(entries)}頭 / horse_id取得済み{len(_horses_with_id)}頭 / df_hist {len(df_hist)}行 / horse_name列: {_has_horse_name}")
-        st.caption(f"🔍 df_hist 最初の10列: {_actual_cols}")
         for _e in entries:
             if not _e.get("horse_id"):
                 continue
@@ -758,7 +754,7 @@ with tab_race:
                 if pd.isna(_last) or pd.Timestamp(_last) < _KAGGLE_CUTOFF:
                     missing.append(_e)
         if missing:
-            st.info(f"📡 {len(missing)}頭の過去成績をnetkeibaから取得中... (db.netkeiba.com)")
+            st.info(f"📡 {len(missing)}頭の最新成績をnetkeibaから補完中...")
             _fetch_prog = st.empty()
             fetched_count = 0
             fail_count = 0
@@ -792,9 +788,7 @@ with tab_race:
                         fetched_count += 1
             _fetch_prog.empty()
             if fetched_count:
-                st.success(f"✅ {fetched_count}頭の過去成績を取得しました（netkeiba）")
-            if fail_count:
-                st.warning(f"⚠️ {fail_count}頭の取得失敗（db.netkeiba.com への接続エラーの可能性）")
+                st.success(f"✅ {fetched_count}頭の最新成績を取得しました")
                 # 取得データを反映した統計テーブルを再計算（df_hist が変わるのでキャッシュミスになる）
                 win_rate_table = get_win_rate_table(df_hist)
                 sire_stats     = get_sire_stats(df_hist)
