@@ -24,6 +24,14 @@ HEADERS = {
 }
 REQUEST_INTERVAL = 3  # 秒
 
+# Streamlit Secrets から netkeiba の認証Cookie を読み込む
+try:
+    _nk_cookie = st.secrets["netkeiba"]["cookie"]
+    if _nk_cookie:
+        HEADERS["Cookie"] = _nk_cookie
+except Exception:
+    pass
+
 # JRA会場コード
 VENUE_CODES = {
     "札幌": "01", "函館": "02", "福島": "03", "新潟": "04",
