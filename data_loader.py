@@ -48,35 +48,47 @@ def categorize_distance(dist):
 @st.cache_data(ttl=3600)
 def load_race_results() -> pd.DataFrame:
     """レース結果CSVを読み込む（なければGoogle Driveから自動DL）"""
-    candidates = list(DATA_DIR.glob("*.csv"))
-    if not candidates:
-        _download_from_gdrive()
+    try:
+        DATA_DIR.mkdir(exist_ok=True)
         candidates = list(DATA_DIR.glob("*.csv"))
-    if not candidates:
-        st.error("データの取得に失敗しました。デモモードをお試しください。")
+        if not candidates:
+            _download_from_gdrive()
+            candidates = list(DATA_DIR.glob("*.csv"))
+        if not candidates:
+            st.warning("過去データCSVが見つかりません。デモモードで動作します。")
+            return pd.DataFrame()
+
+        # ファイル名候補（既知のKaggle JRAデータセット名も含む）
+        priority = [
+            "race_results", "results", "races",
+            "19860105-20210731_race_result",
+            "race_result",
+        ]
+        df = None
+        for name in priority:
+            path = DATA_DIR / f"{name}.csv"
+            if path.exists():
+                try:
+                    df = pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
+                    break
+                except Exception:
+                    continue
+
+        if df is None:
+            try:
+                # 最大サイズのCSVを使う
+                largest = max(candidates, key=lambda f: f.stat().st_size)
+                df = pd.read_csv(largest, encoding="utf-8-sig", low_memory=False)
+            except Exception as e:
+                st.warning(f"CSV読み込み失敗: {e}")
+                return pd.DataFrame()
+
+        df = _normalize_columns(df)
+        df = _add_derived_columns(df)
+        return df
+    except Exception as e:
+        st.warning(f"データ読み込みエラー（デモモードで続行）: {e}")
         return pd.DataFrame()
-
-    # ファイル名候補（既知のKaggle JRAデータセット名も含む）
-    priority = [
-        "race_results", "results", "races",
-        "19860105-20210731_race_result",  # Kaggle JRA dataset
-        "race_result",
-    ]
-    df = None
-    for name in priority:
-        path = DATA_DIR / f"{name}.csv"
-        if path.exists():
-            df = pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
-            break
-
-    if df is None:
-        # 最大サイズのCSVを使う（レース結果は必ず最大ファイル）
-        largest = max(candidates, key=lambda f: f.stat().st_size)
-        df = pd.read_csv(largest, encoding="utf-8-sig", low_memory=False)
-
-    df = _normalize_columns(df)
-    df = _add_derived_columns(df)
-    return df
 
 
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:

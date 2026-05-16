@@ -152,8 +152,7 @@ with st.sidebar:
         with st.spinner("過去データを読み込み中..."):
             df_hist = load_race_results()
         if df_hist.empty:
-            st.error("data/ にCSVがありません。SETUP.md の STEP 3 を参照。または上の「デモモード」で動作確認できます。")
-            st.stop()
+            st.warning("⚠️ 過去データCSVなし。デモモードをオンにするか、データが読み込まれるまでお待ちください。")
         else:
             df_hist = merge_with_horse_cache(df_hist)
             st.success(f"✅ {len(df_hist):,}件のレース結果")
