@@ -59,6 +59,35 @@ def load_race_results() -> pd.DataFrame:
             print("[data_loader] CSVなし - 空DataFrameを返す")
             return pd.DataFrame()
 
+        # 必要な列のみ読み込む（Kaggle JRA CSV の実際の列名）
+        # 472MBを全列読むとメモリ超過するため usecols で絞る
+        NEEDED_COLS = [
+            "着順", "馬名", "距離(m)", "芝・ダート区分",
+            "馬場状態1", "人気", "単勝", "騎手", "上り",
+            "枠番", "馬番", "競馬場名", "レース日付",
+            "馬体重", "場体重増減", "4コーナー",
+            # 英語列名（他データセット用フォールバック）
+            "rank", "horse_name", "distance", "surface",
+            "track_condition", "popularity", "odds", "jockey",
+            "last_3f", "gate", "horse_no", "venue", "date",
+            "horse_weight", "weight_change", "corner_order",
+        ]
+
+        def _read_csv_slim(path):
+            """必要な列だけ読み込む。列が存在しない場合は無視。"""
+            # まずヘッダーだけ読んで存在する列を確認
+            header = pd.read_csv(path, encoding="utf-8-sig", nrows=0)
+            usecols = [c for c in NEEDED_COLS if c in header.columns]
+            if not usecols:
+                # 列名が全く合わない場合は全列読む（小さいCSVのみ）
+                size_mb = path.stat().st_size / 1024 / 1024
+                if size_mb > 100:
+                    print(f"[data_loader] {path.name}: 列名不一致かつ大ファイル({size_mb:.0f}MB) → スキップ")
+                    return None
+                return pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
+            print(f"[data_loader] {path.name}: {len(usecols)}列を選択読み込み")
+            return pd.read_csv(path, encoding="utf-8-sig", usecols=usecols, low_memory=False)
+
         priority = [
             "race_results", "results", "races",
             "19860105-20210731_race_result",
@@ -69,18 +98,24 @@ def load_race_results() -> pd.DataFrame:
             path = DATA_DIR / f"{name}.csv"
             if path.exists():
                 try:
-                    df = pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
-                    print(f"[data_loader] 読み込み成功: {path.name} ({len(df)}行)")
-                    break
+                    df = _read_csv_slim(path)
+                    if df is not None:
+                        print(f"[data_loader] 読み込み成功: {path.name} ({len(df)}行 × {len(df.columns)}列)")
+                        break
                 except Exception as e:
                     print(f"[data_loader] {path.name} 読み込み失敗: {e}")
                     continue
 
         if df is None:
             try:
-                largest = max(candidates, key=lambda f: f.stat().st_size)
-                df = pd.read_csv(largest, encoding="utf-8-sig", low_memory=False)
-                print(f"[data_loader] 最大ファイル使用: {largest.name} ({len(df)}行)")
+                # race_result を含むファイル名を優先
+                race_files = [f for f in candidates if "race_result" in f.name]
+                target = race_files[0] if race_files else max(candidates, key=lambda f: f.stat().st_size)
+                df = _read_csv_slim(target)
+                if df is None:
+                    df = pd.DataFrame()
+                else:
+                    print(f"[data_loader] フォールバック使用: {target.name} ({len(df)}行)")
             except Exception as e:
                 print(f"[data_loader] CSV読み込み失敗: {e}")
                 return pd.DataFrame()
