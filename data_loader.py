@@ -24,15 +24,15 @@ def _download_from_gdrive():
 
     try:
         import gdown
-        st.info("📥 過去データをGoogle Driveからダウンロード中...（初回のみ、数分かかります）")
+        print("[data_loader] Google Driveからダウンロード中...")
         gdown.download_folder(
             f"https://drive.google.com/drive/folders/{GDRIVE_FOLDER_ID}",
             output=str(DATA_DIR),
             quiet=False,
         )
-        st.success("✅ ダウンロード完了！")
+        print("[data_loader] ダウンロード完了")
     except Exception as e:
-        st.warning(f"自動ダウンロード失敗: {e}")
+        print(f"[data_loader] ダウンロード失敗: {e}")
 
 # 距離カテゴリ
 def categorize_distance(dist):
@@ -48,6 +48,7 @@ def categorize_distance(dist):
 @st.cache_data(ttl=3600)
 def load_race_results() -> pd.DataFrame:
     """レース結果CSVを読み込む（なければGoogle Driveから自動DL）"""
+    # 注意: @st.cache_data 内では st.* 呼び出し禁止のため print のみ使用
     try:
         DATA_DIR.mkdir(exist_ok=True)
         candidates = list(DATA_DIR.glob("*.csv"))
@@ -55,10 +56,9 @@ def load_race_results() -> pd.DataFrame:
             _download_from_gdrive()
             candidates = list(DATA_DIR.glob("*.csv"))
         if not candidates:
-            st.warning("過去データCSVが見つかりません。デモモードで動作します。")
+            print("[data_loader] CSVなし - 空DataFrameを返す")
             return pd.DataFrame()
 
-        # ファイル名候補（既知のKaggle JRAデータセット名も含む）
         priority = [
             "race_results", "results", "races",
             "19860105-20210731_race_result",
@@ -70,24 +70,26 @@ def load_race_results() -> pd.DataFrame:
             if path.exists():
                 try:
                     df = pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
+                    print(f"[data_loader] 読み込み成功: {path.name} ({len(df)}行)")
                     break
-                except Exception:
+                except Exception as e:
+                    print(f"[data_loader] {path.name} 読み込み失敗: {e}")
                     continue
 
         if df is None:
             try:
-                # 最大サイズのCSVを使う
                 largest = max(candidates, key=lambda f: f.stat().st_size)
                 df = pd.read_csv(largest, encoding="utf-8-sig", low_memory=False)
+                print(f"[data_loader] 最大ファイル使用: {largest.name} ({len(df)}行)")
             except Exception as e:
-                st.warning(f"CSV読み込み失敗: {e}")
+                print(f"[data_loader] CSV読み込み失敗: {e}")
                 return pd.DataFrame()
 
         df = _normalize_columns(df)
         df = _add_derived_columns(df)
         return df
     except Exception as e:
-        st.warning(f"データ読み込みエラー（デモモードで続行）: {e}")
+        print(f"[data_loader] 致命的エラー: {e}")
         return pd.DataFrame()
 
 
