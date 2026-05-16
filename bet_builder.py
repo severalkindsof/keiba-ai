@@ -55,11 +55,10 @@ def select_axis_horses(
     df = eval_df.copy()
 
     def _col(df, name, default):
-        """列が存在しない場合はデフォルト値で埋めたSeriesを返す"""
-        return pd.to_numeric(
-            df[name] if name in df.columns else default,
-            errors="coerce"
-        ).fillna(default)
+        """列が存在しない場合はデフォルト値のSeriesを返す"""
+        if name in df.columns:
+            return pd.to_numeric(df[name], errors="coerce").fillna(default)
+        return pd.Series(default, index=df.index, dtype=float)
 
     df["ev"]           = _col(df, "ev",                   -0.5)
     df["popularity"]   = _col(df, "popularity",             9)
