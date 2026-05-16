@@ -56,8 +56,12 @@ def load_race_results() -> pd.DataFrame:
         st.error("データの取得に失敗しました。デモモードをお試しください。")
         return pd.DataFrame()
 
-    # Kaggleデータセットのファイル名候補
-    priority = ["race_results", "results", "races"]
+    # ファイル名候補（既知のKaggle JRAデータセット名も含む）
+    priority = [
+        "race_results", "results", "races",
+        "19860105-20210731_race_result",  # Kaggle JRA dataset
+        "race_result",
+    ]
     df = None
     for name in priority:
         path = DATA_DIR / f"{name}.csv"
@@ -66,8 +70,9 @@ def load_race_results() -> pd.DataFrame:
             break
 
     if df is None:
-        # 最初に見つかったCSVを使う
-        df = pd.read_csv(candidates[0], encoding="utf-8-sig", low_memory=False)
+        # 最大サイズのCSVを使う（レース結果は必ず最大ファイル）
+        largest = max(candidates, key=lambda f: f.stat().st_size)
+        df = pd.read_csv(largest, encoding="utf-8-sig", low_memory=False)
 
     df = _normalize_columns(df)
     df = _add_derived_columns(df)
