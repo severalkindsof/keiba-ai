@@ -947,11 +947,12 @@ with tab_race:
                 from knowledge_base import get_proverb_bonus
                 hist_e = df_hist[df_hist["horse_name"] == name].sort_values("date", ascending=False) \
                     if "date" in df_hist.columns else pd.DataFrame()
-                prev_dist_e = int(pd.to_numeric(
-                    hist_e.iloc[0].get("distance", 0), errors="coerce") or 0) \
+                def _safe_int(val, default):
+                    v = pd.to_numeric(val, errors="coerce")
+                    return int(v) if pd.notna(v) else default
+                prev_dist_e = _safe_int(hist_e.iloc[0].get("distance", 0), 0) \
                     if not hist_e.empty else 0
-                prev_rank_e = int(pd.to_numeric(
-                    hist_e.iloc[0].get("rank", 99), errors="coerce") or 99) \
+                prev_rank_e = _safe_int(hist_e.iloc[0].get("rank", 99), 99) \
                     if not hist_e.empty else 99
                 prov = get_proverb_bonus(
                     race_name=st.session_state.get("_race_label", ""),
