@@ -1274,7 +1274,8 @@ with tab_race:
                 st.success(f"🚧 **{row['horse_name']}** — {row.get('hurdle_to_flat_message', '')} ({row['popularity']}番人気)")
 
             # 有力馬撃破実績
-            for _, row in beaten_horses.sort_values("beat_bonus", ascending=False).head(3).iterrows():
+            _sort_col = "beat_bonus" if "beat_bonus" in beaten_horses.columns else beaten_horses.columns[0]
+            for _, row in beaten_horses.sort_values(_sort_col, ascending=False).head(3).iterrows():
                 st.info(f"⚔️ **{row['horse_name']}** — {row.get('beat_label', '')} ({row['popularity']}番人気/{row.get('odds','?')}倍)")
 
             # 回り方向ミスマッチ警告
