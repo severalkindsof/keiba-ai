@@ -1,8 +1,13 @@
 ﻿# シークレット（絶対にコミットしない）
 .streamlit/secrets.toml
 
-# Kaggle データ（大容量のため除外）
+# Kaggle データ・大容量ファイルは除外
 data/
+# ただしモデル・特徴量定義は含める（小サイズのため）
+!data/lgbm_win_model.txt
+!data/lgbm_feature_cols.json
+!data/lgbm_cat_mappings.json
+!data/horse_latest_features.parquet
 
 # SQLite 日記DB（個人データ）
 race_diary.db
