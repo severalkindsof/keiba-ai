@@ -25,21 +25,22 @@ import numpy as np
 import pandas as pd
 
 WEIGHTS = {
-    "ev":               0.22,
-    "pace":             0.10,
-    "draw":             0.07,
-    "jockey":           0.10,
-    "rotation":         0.08,
-    "class_drop":       0.07,
-    "weight":           0.03,
-    "position":         0.08,
-    "weight_ratio":     0.05,
-    "nicks":            0.05,
-    "season":           0.05,
-    "race_level":       0.05,
-    "lap":              0.05,
-    "realtime_bias":    0.10,
-    # 調教は追加ボーナスとして別枠（データあれば加算）
+    # EVは除外: 総合スコアは「馬の実力評価」であり、市場評価(EV)は別表示
+    # "ev": 0.22,  ← 除外
+    "pace":          0.12,  # ペース・展開恩恵
+    "draw":          0.08,  # 枠順バイアス
+    "jockey":        0.12,  # 騎手乗り替わり
+    "rotation":      0.10,  # ローテーション
+    "class_drop":    0.08,  # クラス変動
+    "weight":        0.04,  # 馬体重変化
+    "position":      0.10,  # 前走位置取り補正
+    "weight_ratio":  0.06,  # 斤量馬体重比
+    "nicks":         0.06,  # ニックス
+    "season":        0.06,  # 季節・馬場適性
+    "race_level":    0.06,  # 前走レースレベル
+    "lap":           0.06,  # ラップ適性
+    "realtime_bias": 0.06,  # 当日バイアス
+    # 合計: 1.00 (100%)
 }
 
 SCORE_LABELS = [
@@ -101,9 +102,8 @@ def calc_confluence_score(horse: dict) -> dict:
                    + float(horse.get("time_rank_bonus", 0.0)))
     bias_b        = float(horse.get("realtime_bias_bonus", 0.0))
 
-    # 各スコアを 0〜1 に正規化
+    # 各スコアを 0〜1 に正規化（EVは除外: 実力評価のみ）
     s = {
-        "ev":            _norm_ev(ev),
         "pace":          _norm(pace,         0.03),
         "draw":          _norm(draw,         0.02),
         "jockey":        _norm(jockey,       0.03),
@@ -222,7 +222,7 @@ def calc_confluence_score(horse: dict) -> dict:
         "plus_factors":      plus_factors,
         "recommend_reason":  recommend_reason,
         "factor_breakdown": {
-            "EV期待値":         round(s["ev"] * 100),
+            "EV期待値":         round(_norm_ev(ev) * 100),  # 表示用のみ（スコア計算には含まない）
             "ペース展開":       round(s["pace"] * 100),
             "枠順":             round(s["draw"] * 100),
             "騎手":             round(s["jockey"] * 100),

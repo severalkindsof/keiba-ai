@@ -1210,43 +1210,44 @@ with tab_race:
             st.success(f"🌿 **バイアス: {bias_info.get('label', bias)}** — {bias_info.get('desc', '')}")
 
         # 総合信頼スコアテーブル
-        st.subheader("🎯 総合信頼スコア")
+        st.subheader("🎯 実力スコアと市場評価")
+        st.caption("📊 **実力スコア** = 馬の強さ評価（EVは含まない）　|　**市場評価** = そのオッズが割安か割高か")
 
         # 凡例
         with st.expander("📖 各列の見方", expanded=False):
             st.markdown("""
 | 列名 | 意味 |
 |------|------|
-| **総合スコア** | 0〜100点。**75点以上**が買い推奨ライン。緑=高、黄=中、赤=低 |
-| **判定** | ◎◎最強推奨 / ◎強推奨 / ○推奨 / △検討可 / ▲様子見 / ✕見送り |
-| **推奨理由** | プラス要因の要約。EV+は期待値プラス、EV-0.11は期待値マイナス0.11の意味 |
-| **EV** | 期待値。**プラスなら「オッズが馬の実力より高い（割安）」**。0.2以上が理想 |
-| **プラス数** | 14ファクター中何個がプラスか。多いほど信頼度が高い |
-| **脚質** | 逃げ/先行/中団/差し・追込。今日のペース予測と合わせて判断 |
-| **枠** | 内枠有利/外枠不利などのバイアス判定 |
-| **乗替** | 騎手交代の評価。「鞍上強化」はプラス、「鞍上弱化」はマイナス |
-| **ローテ** | 前走からの出走間隔。「叩き2走目」は上昇見込み |
-| **ロマン危険度** | 「なんとなく気になる」だけで買うと損する馬の危険度 |
+| **実力スコア** | 0〜100点。**馬の実力評価のみ**（EVは含まない）。緑=高、黄=中、赤=低 |
+| **市場評価** | ◎大きく割安 / ○割安 / △適正 / ▲割高 / ✕大きく割高 |
+| **EV値** | 期待値の数値。プラス=割安、マイナス=割高 |
+| **推奨理由** | ローテ・騎手変化など主なプラス要因 |
+| **大穴危険度** | 「なんとなく買う」と損する馬。超大穴は常に極高 |
+| **脚質** | 逃げ/先行/中団/差し・追込 |
+| **枠バイアス** | 内外有利不利の判定 |
+| **乗替** | 騎手交代の評価 |
+| **ローテ** | 出走間隔の評価 |
 """)
 
         # 並び順切り替え
         _sort_mode = st.radio("並び順", ["スコア順（推奨）", "枠番順"], horizontal=True, key="score_sort_mode")
 
-        score_cols = ["gate", "horse_name", "jockey", "popularity", "odds",
+        score_cols = ["gate", "horse_no", "horse_name", "jockey", "popularity", "odds",
                       "confidence_score", "confidence_label", "recommend_reason",
-                      "ev", "plus_factors", "running_style", "draw_label",
-                      "jockey_change_signal", "rotation_signal", "weight_signal", "romance_danger"]
+                      "ev_label", "ev",
+                      "running_style", "draw_label",
+                      "jockey_change_signal", "rotation_signal", "romance_danger"]
         score_cols = [c for c in score_cols if c in eval_df.columns]
         rename_score = {
-            "gate": "枠番", "horse_name": "馬名", "jockey": "騎手",
+            "gate": "枠番", "horse_no": "馬番", "horse_name": "馬名", "jockey": "騎手",
             "popularity": "人気", "odds": "単勝",
-            "confidence_score": "総合スコア", "confidence_label": "判定",
+            "confidence_score": "実力スコア", "confidence_label": "判定",
             "recommend_reason": "推奨理由",
-            "ev": "EV", "plus_factors": "プラス数",
+            "ev_label": "市場評価", "ev": "EV値",
             "running_style": "脚質", "draw_label": "枠バイアス",
             "jockey_change_signal": "乗替",
-            "rotation_signal": "ローテ", "weight_signal": "体重",
-            "romance_danger": "ロマン危険度",
+            "rotation_signal": "ローテ",
+            "romance_danger": "大穴危険度",
         }
 
         _display_df = eval_df.sort_values("gate") if "枠番順" in _sort_mode and "gate" in eval_df.columns else eval_df

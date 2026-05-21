@@ -343,6 +343,7 @@ def evaluate_horse(
         "lgbm_win_rate": round(lgbm_win_rate * 100, 1) if lgbm_used else None,
         "lgbm_used": lgbm_used,
         "romance_danger": romance_danger,
+        "ev_label":       ev_label(ev),
         "verdict": _verdict(ev, ev_place, popularity, adjusted_win_rate, odds),
         # 新ファクター（後から付与されるフィールドのデフォルト値）
         "pace_benefit": horse.get("pace_benefit", 0.0),
@@ -375,19 +376,37 @@ def evaluate_horse(
 def _romance_danger_score(popularity: int, win_rate: float, odds: float) -> str:
     """
     穴馬を「ロマンだけで」買う危険度。
-    EVがマイナスかつ人気が低い馬は危険ラベルをつける。
+    人気度を基本判定基準とし、EVは補助的に使用。
     """
+    # 人気馬は「ロマン爆死」リスクが低い
+    if popularity <= 3:
+        return "低（本命）"
+    if popularity <= 6:
+        return "低（中穴）"
+    # 超大穴は人気度で強制フラグ（EV+でも高リスク）
+    if popularity >= 15:
+        return "極高（超大穴）"
+    if popularity >= 12 or odds >= 100:
+        return "高（大穴）"
+    # 7〜11番人気はEVで判断
     ev = calc_ev(win_rate, odds)
-    if popularity < 7:
-        return "低"
     if np.isnan(ev) or ev < -0.3:
-        return "極高（要注意）"
-    elif ev < -0.1:
         return "高"
-    elif ev < 0:
+    elif ev < -0.1:
         return "中"
     else:
-        return "低（EV+）"
+        return "中（穴馬注意）"
+
+
+def ev_label(ev: float) -> str:
+    """EV値を日本語ラベルに変換（市場評価の表示用）"""
+    if np.isnan(ev):
+        return "？ データ不足"
+    if ev >= 0.5:   return "◎ 大きく割安"
+    if ev >= 0.1:   return "○ 割安"
+    if ev >= -0.1:  return "△ 適正"
+    if ev >= -0.3:  return "▲ 割高"
+    return "✕ 大きく割高"
 
 
 def _verdict(ev: float, ev_place: float, popularity: int, win_rate: float, odds: float) -> str:
