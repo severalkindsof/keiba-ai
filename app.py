@@ -888,6 +888,24 @@ with tab_race:
         e.setdefault("distance_cat", dist_cat)
         e.setdefault("race_date", current_date_str)
 
+    # ---- 天気予報・馬場状態予測 ---- #
+    from scraper import fetch_weather_forecast
+    _wx_col1, _wx_col2 = st.columns([1, 2])
+    with _wx_col1:
+        _wx_venue = selected_venue if "selected_venue" in dir() else ""
+    _race_date_for_wx = current_date_str  # YYYY-MM-DD 形式
+    if _wx_venue:
+        _wx = fetch_weather_forecast(_wx_venue, _race_date_for_wx)
+        if _wx.get("raw_code", -1) >= 0:
+            _rain = _wx["precipitation_mm"]
+            _cond = _wx["condition_forecast"]
+            _icon = "☀️" if _rain == 0 else ("🌧️" if _rain >= 5 else "🌦️")
+            st.info(
+                f"**{_wx_venue} {_race_date_for_wx} 天気予報**  \n"
+                f"{_icon} {_wx['weather']}　降水量: {_rain}mm  \n"
+                f"🏇 馬場予測: **{_cond}**"
+            )
+
     # ---- 当日バイアス入力 ---- #
     selected_race_id_for_bias = st.session_state.get("preselected_race_id", "")
     bias_type = render_bias_input_panel(selected_race_id_for_bias or None)

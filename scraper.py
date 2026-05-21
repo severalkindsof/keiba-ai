@@ -236,6 +236,93 @@ def _enrich_odds_fallback(race_id: str, entries: list[dict]) -> list[dict]:
     return entries
 
 
+# ---- 競馬場の座標 ----
+_VENUE_COORDS = {
+    "東京":  (35.764, 139.490),
+    "中山":  (35.778, 139.920),
+    "阪神":  (34.838, 135.401),
+    "京都":  (34.901, 135.723),
+    "中京":  (35.098, 136.942),
+    "小倉":  (33.868, 130.868),
+    "新潟":  (37.866, 139.044),
+    "福島":  (37.784, 140.466),
+    "函館":  (41.768, 140.729),
+    "札幌":  (43.058, 141.381),
+}
+
+# WMO天気コード → 日本語
+_WMO_LABEL = {
+    0: "快晴", 1: "晴れ", 2: "薄曇", 3: "曇り",
+    45: "霧", 48: "霧氷",
+    51: "霧雨(弱)", 53: "霧雨", 55: "霧雨(強)",
+    61: "小雨", 63: "雨", 65: "大雨",
+    71: "小雪", 73: "雪", 75: "大雪",
+    80: "にわか雨(弱)", 81: "にわか雨", 82: "にわか雨(強)",
+    95: "雷雨", 96: "雷雨+雹", 99: "激しい雷雨",
+}
+
+def _wmo_to_label(code: int) -> str:
+    return _WMO_LABEL.get(code, f"コード{code}")
+
+def _rain_to_condition(rain_mm: float) -> str:
+    """予想降水量から馬場状態を推定"""
+    if rain_mm >= 15: return "不良の可能性"
+    if rain_mm >= 5:  return "重〜稍重の可能性"
+    if rain_mm >= 1:  return "稍重の可能性"
+    return "良馬場見込み"
+
+
+@st.cache_data(ttl=3600)
+def fetch_weather_forecast(venue: str, race_date: str) -> dict:
+    """
+    競馬場の週末天気予報を取得する（OpenMeteo API, 無料・APIキー不要）。
+
+    Args:
+        venue: 競馬場名（東京、阪神、中山 など）
+        race_date: レース日（YYYY-MM-DD形式）
+
+    Returns:
+        {
+          "date": "2026-05-25",
+          "weather": "晴れ",
+          "precipitation_mm": 0.0,
+          "condition_forecast": "良馬場見込み",
+          "raw_code": 1
+        }
+    """
+    coords = _VENUE_COORDS.get(venue)
+    if coords is None:
+        return {"date": race_date, "weather": "不明", "precipitation_mm": 0.0,
+                "condition_forecast": "データなし", "raw_code": -1}
+
+    lat, lon = coords
+    url = (f"https://api.open-meteo.com/v1/forecast"
+           f"?latitude={lat}&longitude={lon}"
+           f"&daily=weathercode,precipitation_sum,temperature_2m_max"
+           f"&forecast_days=10&timezone=Asia%2FTokyo")
+    try:
+        r = requests.get(url, timeout=8)
+        data = r.json()
+        daily = data.get("daily", {})
+        dates = daily.get("time", [])
+        if race_date in dates:
+            idx = dates.index(race_date)
+            code  = daily["weathercode"][idx]
+            rain  = float(daily["precipitation_sum"][idx] or 0)
+            return {
+                "date": race_date,
+                "weather": _wmo_to_label(code),
+                "precipitation_mm": rain,
+                "condition_forecast": _rain_to_condition(rain),
+                "raw_code": code,
+            }
+        return {"date": race_date, "weather": "予報期間外", "precipitation_mm": 0.0,
+                "condition_forecast": "データなし", "raw_code": -1}
+    except Exception as e:
+        return {"date": race_date, "weather": "取得失敗", "precipitation_mm": 0.0,
+                "condition_forecast": "データなし", "raw_code": -1}
+
+
 def fetch_horse_sire(horse_id: str) -> str:
     """馬の父名を血統ページから取得する"""
     url = f"https://db.netkeiba.com/horse/{horse_id}"
