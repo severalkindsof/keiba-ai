@@ -167,11 +167,38 @@ def calc_confluence_score(horse: dict) -> dict:
             label, description = lbl, desc
             break
 
+    # ---- 推奨理由を一言で生成 ----
+    reason_parts = []
+    if ev > 0.2:           reason_parts.append("EV+")
+    if jockey > 0.01:      reason_parts.append("騎手強化")
+    if rotation > 0.01:    reason_parts.append("ローテ良")
+    if lap_b > 0.01:       reason_parts.append("末脚◎")
+    if draw > 0.01:        reason_parts.append("枠有利")
+    if season_b > 0.01:    reason_parts.append("適性◎")
+    if race_level_b > 0.01: reason_parts.append("格上挑戦")
+    if bias_b > 0.01:      reason_parts.append("バイアス◎")
+    # horse_stats由来のボーナス
+    hs_details = horse.get("horse_stats_details", {})
+    if isinstance(hs_details, dict):
+        if any("距離適性◎" in k for k in hs_details): reason_parts.append("距離実績◎")
+        if any("道悪◎" in k for k in hs_details):     reason_parts.append("道悪得意")
+        if any("末脚◎" in k for k in hs_details):     reason_parts.append("上がり上位")
+        if any("外国人" in k for k in hs_details):     reason_parts.append("外国人騎手")
+    # 調教
+    if horse.get("training_label", "") in ("調教◎（状態良好）", "調教○（普通以上）"):
+        reason_parts.append("追い切り良")
+    # マイナス要因
+    if jockey < -0.01:     reason_parts.append("⚠鞍上弱化")
+    if rotation < -0.01:   reason_parts.append("⚠ローテ難")
+
+    recommend_reason = " / ".join(reason_parts) if reason_parts else "判断材料不足"
+
     return {
-        "confidence_score": score,
-        "confidence_label": label,
-        "confidence_desc":  description,
-        "plus_factors":     plus_factors,
+        "confidence_score":  score,
+        "confidence_label":  label,
+        "confidence_desc":   description,
+        "plus_factors":      plus_factors,
+        "recommend_reason":  recommend_reason,
         "factor_breakdown": {
             "EV期待値":         round(s["ev"] * 100),
             "ペース展開":       round(s["pace"] * 100),

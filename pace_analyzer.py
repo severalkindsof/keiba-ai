@@ -25,25 +25,37 @@ def infer_running_style(history: pd.DataFrame) -> str:
     """過去成績のコーナー通過順から脚質を推定"""
     if history.empty:
         return "不明"
-    if "corner_order" in history.columns:
+    # TFJVデータはcorner4列、旧データはcorner_order列を使う
+    for col in ["corner4", "corner_order"]:
+        if col not in history.columns:
+            continue
         try:
-            positions = []
-            for val in history["corner_order"].dropna().head(5):
-                first = str(val).split("-")[0].split(",")[0].strip()
-                positions.append(int(first))
+            if col == "corner4":
+                positions = pd.to_numeric(history[col], errors="coerce").dropna().head(5).tolist()
+            else:
+                positions = []
+                for val in history[col].dropna().head(5):
+                    first = str(val).split("-")[0].split(",")[0].strip()
+                    if first.isdigit():
+                        positions.append(int(first))
             if not positions:
-                return "不明"
-            avg = np.mean(positions)
-            if avg <= 2:
+                continue
+            # 直近2走を重視した加重平均
+            weights = [2 if i < 2 else 1 for i in range(len(positions))]
+            avg = np.average(positions[:len(weights)], weights=weights[:len(positions)])
+            field_series = pd.to_numeric(history.get("field_size", pd.Series([16]*len(history))), errors="coerce")
+            field = field_series.mean() if pd.notna(field_series.mean()) and field_series.mean() > 0 else 16
+            ratio = avg / field
+            if ratio <= 0.12:
                 return "逃げ"
-            elif avg <= 5:
+            elif ratio <= 0.30:
                 return "先行"
-            elif avg <= 9:
+            elif ratio <= 0.55:
                 return "中団"
             else:
                 return "差し・追込"
         except Exception:
-            pass
+            continue
     # コーナーなければ上がり3Fで推定
     if "last_3f" in history.columns:
         avg3f = pd.to_numeric(history["last_3f"], errors="coerce").mean()
@@ -157,9 +169,10 @@ def analyze_field_pace(
         h2 = dict(h)
         name = h2.get("horse_name", "")
         if not h2.get("running_style") and not df_hist.empty and "horse_name" in df_hist.columns:
-            hist = df_hist[df_hist["horse_name"] == name].sort_values(
-                "date", ascending=False
-            ).head(5) if "date" in df_hist.columns else df_hist[df_hist["horse_name"] == name].head(5)
+            hist = df_hist[df_hist["horse_name"].str.strip() == name.strip()]
+            if "date" in df_hist.columns:
+                hist = hist.sort_values("date", ascending=False)
+            hist = hist.head(5)
             h2["running_style"] = infer_running_style(hist)
         horses_out.append(h2)
 

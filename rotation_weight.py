@@ -115,20 +115,26 @@ def analyze_rotation(
             "days": days,
             "message": f"{label}（{days}日）：理想的なローテーション",
         }
-    elif days <= 84:
+    elif days <= 56:
+        return {
+            "signal": "やや間隔空き",
+            "bonus": -0.01,
+            "days": days,
+            "message": f"やや間隔空き（{days}日）：状態確認推奨",
+        }
+    elif days <= 90:
         return {
             "signal": "休養明け（叩き1走目）",
-            "bonus": -0.03,          # ユーザーの方針に合わせ強いペナルティ
+            "bonus": -0.03,
             "days": days,
-            "message": f"⛔ 叩き1走目（{days}日ぶり）：基本買わない対象。調教が抜群でも慎重に。",
+            "message": f"⛔ 休養明け（{days}日ぶり）：叩き1走目、調教内容を要確認",
         }
     else:
-        # 長期休養明け（さらに強い警告）
         return {
-            "signal": "長期休養明け（叩き1走目）",
+            "signal": "長期休養明け",
             "bonus": -0.05,
             "days": days,
-            "message": f"⛔ 長期休養明け（{days}日ぶり）：叩き1走目は買わないルール適用推奨。",
+            "message": f"⛔ 長期休養明け（{days}日ぶり）：本番仕上がり未知数",
         }
 
 
@@ -305,7 +311,7 @@ def analyze_rotation_for_field(
 
         hist = pd.DataFrame()
         if not df_hist.empty and "horse_name" in df_hist.columns and name:
-            hist = df_hist[df_hist["horse_name"] == name]
+            hist = df_hist[df_hist["horse_name"].str.strip() == name.strip()]
             if "date" in df_hist.columns:
                 hist = hist.sort_values("date", ascending=False)
             hist = hist.head(5)

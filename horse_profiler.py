@@ -17,7 +17,7 @@ def get_horse_history(df: pd.DataFrame, horse_name: str, n: int = 5) -> pd.DataF
     """過去n走のレース成績を返す"""
     if "horse_name" not in df.columns or df.empty:
         return pd.DataFrame()
-    hist = df[df["horse_name"] == horse_name].copy()
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()].copy()
     if "date" in hist.columns:
         hist = hist.sort_values("date", ascending=False)
     return hist.head(n)
@@ -33,7 +33,7 @@ def calc_distance_aptitude(df: pd.DataFrame, horse_name: str, distance: int) -> 
 
     from data_loader import categorize_distance
     dist_cat = categorize_distance(distance)
-    hist = df[df["horse_name"] == horse_name]
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()]
 
     if hist.empty:
         return {"score": 50, "detail": "出走履歴なし"}
@@ -66,7 +66,7 @@ def calc_surface_aptitude(df: pd.DataFrame, horse_name: str, surface: str) -> di
     if df.empty or "horse_name" not in df.columns or "surface" not in df.columns:
         return {"score": 50, "detail": "データなし"}
 
-    hist = df[(df["horse_name"] == horse_name) & (df["surface"] == surface)]
+    hist = df[(df["horse_name"].str.strip() == horse_name.strip()) & (df["surface"] == surface)]
     total = len(hist)
     if total == 0:
         return {"score": 50, "detail": f"{surface}での出走なし"}
@@ -95,25 +95,40 @@ def calc_running_style(df: pd.DataFrame, horse_name: str) -> str:
     """
     if df.empty or "horse_name" not in df.columns:
         return "不明"
-    hist = df[df["horse_name"] == horse_name]
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()]
     if hist.empty:
         return "不明"
 
-    if "corner_order" in hist.columns:
-        # コーナー通過順の先頭文字から先行/差しを判定
-        try:
-            first_corners = hist["corner_order"].dropna().apply(
-                lambda x: int(str(x).split("-")[0]) if "-" in str(x) else int(str(x).split(",")[0])
-            )
-            avg_pos = first_corners.mean()
-            if avg_pos <= 3:
-                return "逃げ・先行"
-            elif avg_pos <= 6:
-                return "中団"
-            else:
-                return "差し・追込"
-        except Exception:
-            pass
+    # TFJVデータのcorner4（4コーナー位置）から判定
+    for col in ["corner4", "corner_order"]:
+        if col in hist.columns:
+            try:
+                if col == "corner_order":
+                    pos = hist[col].dropna().apply(
+                        lambda x: int(str(x).split("-")[-1]) if "-" in str(x)
+                        else int(str(x).split(",")[-1]) if "," in str(x)
+                        else int(str(x).strip()) if str(x).strip().isdigit() else None
+                    ).dropna()
+                else:
+                    pos = pd.to_numeric(hist[col], errors="coerce").dropna()
+
+                if len(pos) == 0:
+                    continue
+                avg_pos = pos.mean()
+                # 頭数比率で判定（絶対位置でなく相対位置）
+                total = pd.to_numeric(hist.get("field_size", pd.Series(16)), errors="coerce").mean()
+                total = total if pd.notna(total) and total > 0 else 16
+                ratio = avg_pos / total
+                if ratio <= 0.25:
+                    return "逃げ・先行"
+                elif ratio <= 0.5:
+                    return "先行"
+                elif ratio <= 0.70:
+                    return "中団"
+                else:
+                    return "差し・追込"
+            except Exception:
+                continue
 
     if "last_3f" in hist.columns:
         avg_3f = pd.to_numeric(hist["last_3f"], errors="coerce").mean()
@@ -150,7 +165,7 @@ def calc_venue_distance_aptitude(
     if df.empty or "horse_name" not in df.columns:
         return {"score": 50, "detail": "データなし", "races": 0}
 
-    hist = df[df["horse_name"] == horse_name].copy()
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()].copy()
     if hist.empty:
         return {"score": 50, "detail": "出走履歴なし", "races": 0}
 
@@ -242,7 +257,7 @@ def calc_last3f_rank(
                 "is_fast": False, "label": "データなし", "bonus": 0.0}
 
     # 直近N走の自身の上がり3F
-    hist = df[df["horse_name"] == horse_name].copy()
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()].copy()
     if "date" in hist.columns:
         hist = hist.sort_values("date", ascending=False)
     recent = hist.head(n_races)
@@ -365,7 +380,7 @@ def get_weight_trend(df: pd.DataFrame, horse_name: str, n: int = 10) -> dict:
         return {"weights": [], "dates": [], "trend": "不明", "slope": 0.0,
                 "last_change": None, "label": "体重データなし", "bonus": 0.0}
 
-    hist = df[df["horse_name"] == horse_name].copy()
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()].copy()
     if "date" in hist.columns:
         hist = hist.sort_values("date", ascending=True)
 
@@ -455,7 +470,7 @@ def get_corner_position_stats(
     if df.empty or "horse_name" not in df.columns or "corner_order" not in df.columns:
         return empty
 
-    hist = df[df["horse_name"] == horse_name].copy()
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()].copy()
     if surface and "surface" in hist.columns:
         hist = hist[hist["surface"] == surface]
 
@@ -599,7 +614,7 @@ def calc_time_rank(
     if df.empty or "horse_name" not in df.columns:
         return empty
 
-    hist = df[df["horse_name"] == horse_name].copy()
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()].copy()
     if hist.empty:
         return empty
 
@@ -844,7 +859,7 @@ def check_first_time_conditions(
     if df.empty or "horse_name" not in df.columns:
         return empty
 
-    hist = df[df["horse_name"] == horse_name].copy()
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()].copy()
     if hist.empty:
         return empty
 
@@ -1010,7 +1025,7 @@ def check_field_size_change(
         return empty
 
     # race_idごとの出走頭数を取得
-    hist = df[df["horse_name"] == horse_name].copy()
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()].copy()
     if surface and "surface" in hist.columns:
         hist = hist[hist["surface"] == surface]
     if "date" in hist.columns:
@@ -1103,7 +1118,7 @@ def check_closing_pace_fit(
     if df.empty or "horse_name" not in df.columns:
         return empty
 
-    hist = df[df["horse_name"] == horse_name].copy()
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()].copy()
     if "date" in hist.columns:
         hist = hist.sort_values("date", ascending=False)
 
@@ -1227,7 +1242,7 @@ def calc_turn_aptitude(
     if df.empty or "horse_name" not in df.columns or "venue" not in df.columns:
         return empty
 
-    hist = df[df["horse_name"] == horse_name].copy()
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()].copy()
     if surface and "surface" in hist.columns:
         hist = hist[hist["surface"] == surface]
     if hist.empty:
@@ -1369,7 +1384,7 @@ def analyze_recent_races(
     if df.empty or "horse_name" not in df.columns:
         return []
 
-    hist = df[df["horse_name"] == horse_name].copy()
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()].copy()
     if hist.empty:
         return []
 
@@ -1607,7 +1622,7 @@ def calc_beaten_strong_horses(
         return empty
 
     # この馬の過去成績
-    hist = df[df["horse_name"] == horse_name].copy()
+    hist = df[df["horse_name"].str.strip() == horse_name.strip()].copy()
     if hist.empty:
         return empty
 
@@ -1646,7 +1661,7 @@ def calc_beaten_strong_horses(
         if race_df.empty:
             continue
 
-        my_rows = race_df[race_df["horse_name"] == horse_name]
+        my_rows = race_df[race_df["horse_name"].str.strip() == horse_name.strip()]
         if my_rows.empty:
             continue
         my_rank = pd.to_numeric(my_rows["rank"].iloc[0], errors="coerce")

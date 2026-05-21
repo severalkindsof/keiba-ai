@@ -45,10 +45,33 @@ def categorize_distance(dist):
     else:
         return "長距離"
 
+TFJV_PARQUET = Path(__file__).parent / "data" / "tfjv_all.parquet"
+
+@st.cache_resource
+def load_tfjv_data() -> pd.DataFrame:
+    """TFJVデータをParquetから読み込む（17MB、起動1秒以内）"""
+    if not TFJV_PARQUET.exists():
+        return pd.DataFrame()
+    print(f"[data_loader] Parquet読み込み中: {TFJV_PARQUET}")
+    df = pd.read_parquet(TFJV_PARQUET)
+    print(f"[data_loader] 読み込み完了: {len(df):,}行")
+    return df
+
+
 @st.cache_data(ttl=3600)
 def load_race_results() -> pd.DataFrame:
-    """レース結果CSVを読み込む（なければGoogle Driveから自動DL）"""
+    """レース結果CSVを読み込む（TFJVデータ優先、なければKaggle）"""
     # 注意: @st.cache_data 内では st.* 呼び出し禁止のため print のみ使用
+    # TFJVデータが使える場合は優先して返す（2016-2025、より新しい）
+    tfjv_df = load_tfjv_data()
+    if not tfjv_df.empty:
+        if "distance_cat" not in tfjv_df.columns:
+            tfjv_df["distance_cat"] = tfjv_df["distance"].apply(
+                lambda x: categorize_distance(int(x)) if pd.notna(x) else "中距離"
+            )
+        print(f"[data_loader] TFJVデータを使用: {len(tfjv_df):,}行, 列: {list(tfjv_df.columns[:8])}")
+        return tfjv_df
+
     try:
         DATA_DIR.mkdir(exist_ok=True)
         candidates = list(DATA_DIR.glob("*.csv"))
@@ -224,8 +247,12 @@ def _add_derived_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-@st.cache_data(ttl=3600)
+@st.cache_resource
 def get_win_rate_table(df: pd.DataFrame) -> pd.DataFrame:
+    """勝率テーブル（事前計算parquet優先）"""
+    p = Path(__file__).parent / "data" / "win_rate_table.parquet"
+    if p.exists():
+        return pd.read_parquet(p)
     """
     条件別勝率テーブルを構築。
     グループ: surface × distance_cat × popularity_bucket
@@ -260,39 +287,37 @@ def get_win_rate_table(df: pd.DataFrame) -> pd.DataFrame:
     return tbl
 
 
-@st.cache_data(ttl=3600)
+@st.cache_resource
 def get_sire_stats(df: pd.DataFrame) -> pd.DataFrame:
-    """父系別・距離帯別の勝率（血統分析用）"""
+    """父系統計（事前計算parquet優先）"""
+    p = Path(__file__).parent / "data" / "sire_stats.parquet"
+    if p.exists():
+        return pd.read_parquet(p)
     if "sire" not in df.columns or df.empty:
         return pd.DataFrame()
-    tbl = (
-        df.groupby(["sire", "distance_cat"], observed=True)
-        .agg(races=("win_flag", "count"), wins=("win_flag", "sum"))
-        .reset_index()
-    )
-    tbl = tbl[tbl["races"] >= 10]  # サンプル数が少なすぎる組み合わせを除外
+    tbl = (df.groupby(["sire","distance_cat"], observed=True)
+           .agg(races=("win_flag","count"), wins=("win_flag","sum")).reset_index())
+    tbl = tbl[tbl["races"] >= 10]
     tbl["win_rate"] = tbl["wins"] / tbl["races"]
     return tbl.sort_values("win_rate", ascending=False)
 
 
-@st.cache_data(ttl=3600)
+@st.cache_resource
 def get_jockey_stats(df: pd.DataFrame) -> pd.DataFrame:
-    """騎手別・人気帯別の複勝率（穴騎手リスト用）"""
+    """騎手統計（事前計算parquet優先）"""
+    p = Path(__file__).parent / "data" / "jockey_stats.parquet"
+    if p.exists():
+        return pd.read_parquet(p)
     if "jockey" not in df.columns or df.empty:
         return pd.DataFrame()
-    df2 = df.copy()
-    df2["popularity"] = pd.to_numeric(df2["popularity"], errors="coerce")
-    df2["is_longshot"] = df2["popularity"] >= 10
-    longshot = (
-        df2[df2["is_longshot"]]
-        .groupby("jockey")
-        .agg(rides=("win_flag", "count"), wins=("win_flag", "sum"), places=("place_flag", "sum"))
-        .reset_index()
-    )
-    longshot = longshot[longshot["rides"] >= 20]
-    longshot["place_rate_longshot"] = longshot["places"] / longshot["rides"]
-    longshot["win_rate_longshot"] = longshot["wins"] / longshot["rides"]
-    return longshot.sort_values("place_rate_longshot", ascending=False)
+    ls = df[pd.to_numeric(df["popularity"], errors="coerce") >= 10]
+    jky = (ls.groupby("jockey")
+           .agg(rides=("win_flag","count"), wins=("win_flag","sum"), places=("place_flag","sum"))
+           .reset_index())
+    jky = jky[jky["rides"] >= 20]
+    jky["place_rate_longshot"] = jky["places"] / jky["rides"]
+    jky["win_rate_longshot"]   = jky["wins"]   / jky["rides"]
+    return jky.sort_values("place_rate_longshot", ascending=False)
 
 
 # ---- netkeibaスクレイピング結果のキャッシュ管理 ---- #

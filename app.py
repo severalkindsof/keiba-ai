@@ -162,6 +162,9 @@ with st.sidebar:
         sire_stats      = get_sire_stats(df_hist)
         jockey_stats    = get_jockey_stats(df_hist)
         draw_table      = build_dynamic_draw_table(df_hist)
+    with st.spinner("馬別プロファイル指標を構築中..."):
+        from horse_stats import build_horse_stats
+        horse_stats_df  = build_horse_stats(df_hist)
         nicks_table     = build_nicks_table(df_hist)
         race_level_table = build_race_level_table(df_hist)
     # 統計テーブルの状態をサイドバーに表示（デバッグ用）
@@ -213,10 +216,9 @@ with st.sidebar:
 # ============================================================
 init_db()  # DBを初期化（初回起動時のみテーブル作成）
 
-(tab_home, tab_scan, tab_race, tab_horses, tab_bet,
+(tab_home, tab_race, tab_horses, tab_bet,
  tab_chat, tab_odds, tab_diary, tab_backtest, tab_jockey, tab_kb) = st.tabs([
     "🏠 ホーム",
-    "🔭 週末スキャン",
     "📋 レース分析",
     "🐎 馬プロファイル",
     "💰 馬券構成",
@@ -497,9 +499,11 @@ with tab_home:
                         st.error(f"API呼び出しエラー: {e}")
 
 # ============================================================
-# TAB 1: 週末レーススキャン（詳細）
-# ============================================================
-with tab_scan:
+# 週末スキャンタブは廃止（レース詳細分析タブに統合済み）
+_tab_scan_disabled = True
+if not _tab_scan_disabled:
+ pass
+if False:
     st.subheader("🔭 週末全レーススキャン")
     st.caption("JRA全レース（平場含む）をスキャンして期待値が高いレースをランキング表示します")
 
@@ -527,8 +531,8 @@ with tab_scan:
             value=",".join(weekend_dates),
         )
     with col_r:
-        max_races = st.number_input("スキャン上限レース数", min_value=3, max_value=50,
-                                    value=10 if "9R" in scan_mode else 24)
+        max_races = st.number_input("スキャン上限レース数", min_value=3, max_value=100,
+                                    value=36 if "9R" in scan_mode else 72)
 
     # 接続診断ボタン
     with st.expander("🔧 接続テスト（うまく動かない場合）"):
@@ -676,6 +680,69 @@ with tab_scan:
 with tab_race:
     st.subheader("📋 レース詳細分析")
 
+    # ---- 今週の注目レース指定 & 調教データ取得 ---- #
+    with st.expander("🏋️ 追い切り情報を収集する（水・木に実行）", expanded=False):
+        st.caption("対象レースを名前で選んで調教データを取得します。分析スコアに自動反映されます。")
+
+        # 今週末のレース一覧を取得してドロップダウンに表示
+        @st.cache_data(ttl=1800)
+        def _load_weekend_races_for_training():
+            all_races = []
+            for _d in get_this_weekend_dates():
+                _r = fetch_today_races(_d)
+                all_races.extend(_r)
+            # 重複除去・9R以降に絞る
+            seen = set()
+            result = []
+            for r in all_races:
+                if r["race_id"] not in seen and int(r["race_id"][-2:]) >= 9:
+                    seen.add(r["race_id"])
+                    result.append(r)
+            return result
+
+        _weekend_races = _load_weekend_races_for_training()
+        if _weekend_races:
+            _race_options = {f"{r['race_name']}": r["race_id"] for r in _weekend_races}
+            _tr_col1, _tr_col2 = st.columns([3, 1])
+            with _tr_col1:
+                _selected_race_name = st.selectbox(
+                    "対象レースを選ぶ",
+                    list(_race_options.keys()),
+                    key="training_race_select"
+                )
+            with _tr_col2:
+                st.write("")
+                _fetch_training_btn = st.button("📥 調教データ取得", type="primary", key="fetch_tr_btn")
+
+            if _fetch_training_btn:
+                _focus_race_id = _race_options[_selected_race_name]
+                from training_fetcher import fetch_race_training
+                with st.spinner(f"{_selected_race_name} の調教データを取得中..."):
+                    _tr_data = fetch_race_training(_focus_race_id)
+                st.session_state["training_data"] = _tr_data
+                st.session_state["training_race_name"] = _selected_race_name
+                st.success(f"✅ {_selected_race_name}：{len(_tr_data.get('horses', {}))}頭の調教データを取得しました")
+        else:
+            st.info("今週末のレース一覧を取得できませんでした。金曜以降に再試行してください。")
+
+        # 取得済みデータの表示
+        from training_fetcher import list_cached_races, get_cached_training
+        _cached = list_cached_races()
+        if _cached:
+            st.divider()
+            _sel = st.selectbox(
+                "取得済みデータを再読み込み",
+                ["---"] + _cached,
+                key="sel_cached_tr"
+            )
+            if _sel != "---":
+                st.session_state["training_data"] = get_cached_training(_sel)
+
+        if st.session_state.get("training_data"):
+            _tn = st.session_state.get("training_race_name", "")
+            _th = len(st.session_state["training_data"].get("horses", {}))
+            st.success(f"✅ 現在の調教データ: {_tn} ({_th}頭)")
+
     fetch_mode = st.radio(
         "データ取得方法",
         ["🌐 netkeibaから自動取得", "✏️ 手動入力"],
@@ -687,13 +754,20 @@ with tab_race:
         # スキャンタブからの引き継ぎ
         preselected = st.session_state.get("preselected_race_id")
 
-        # 今日のレースがなければ週末日付を順に試す
-        _dates_to_try = list(dict.fromkeys([date_str] + get_this_weekend_dates()))
-        with st.spinner("レース一覧を取得中..."):
+        # キャッシュクリアボタン
+        if st.button("🔄 レース一覧を再取得", key="clear_race_cache"):
+            fetch_today_races.clear()
+            st.rerun()
+
+        # 土日両日のレースをすべて取得（今日 + 今週末）
+        _dates_to_try = list(dict.fromkeys(get_this_weekend_dates() + [date_str]))
+        with st.spinner("土日のレース一覧を取得中..."):
             for _d in _dates_to_try:
-                races = fetch_today_races(_d)
-                if races:
-                    break
+                _r = fetch_today_races(_d)
+                races.extend(_r)
+        # race_idで重複除去
+        _seen = set()
+        races = [r for r in races if r["race_id"] not in _seen and not _seen.add(r["race_id"])]
         if not races:
             st.warning("レース情報を取得できませんでした。手動入力に切り替えてください。")
             fetch_mode = "✏️ 手動入力"
@@ -706,12 +780,27 @@ with tab_race:
             "01":"札幌","02":"函館","03":"福島","04":"新潟","05":"東京",
             "06":"中山","07":"中京","08":"京都","09":"阪神","10":"小倉",
         }
-        # レースを会場別グループに分類
+        # race_idの日付部分（先頭8桁）を「M/D(曜)」形式に変換
+        _YOUBI = ["月","火","水","木","金","土","日"]
+        _DATE_LABEL: dict[str, str] = {}
+        for _r in races:
+            _d8 = _r["race_id"][:8]
+            if _d8 not in _DATE_LABEL:
+                try:
+                    from datetime import datetime as _dt
+                    _dobj = _dt.strptime(_d8, "%Y%m%d")
+                    _DATE_LABEL[_d8] = f"{_dobj.month}/{_dobj.day}({_YOUBI[_dobj.weekday()]})"
+                except Exception:
+                    _DATE_LABEL[_d8] = _d8[4:]
+
+        # レースを「日付+会場」グループに分類（日付昇順）
         _venue_groups: dict[str, list] = {}
-        for r in races:
+        for r in sorted(races, key=lambda x: x["race_id"]):
             _vc = r["race_id"][4:6]
             _vname = _VENUE_MAP.get(_vc, f"会場{_vc}")
-            _venue_groups.setdefault(_vname, []).append(r)
+            _dlabel = _DATE_LABEL.get(r["race_id"][:8], "")
+            _key = _vname
+            _venue_groups.setdefault(_key, []).append(r)
 
         # 会場を選んでからレースを選ぶ2段階UI
         _venue_names = list(_venue_groups.keys())
@@ -723,6 +812,10 @@ with tab_race:
                     break
         selected_venue = st.selectbox("会場を選択", _venue_names, index=_default_venue_idx)
         _venue_races = _venue_groups[selected_venue]
+        # 9R以降のみ表示
+        _venue_races = [r for r in _venue_races if int(r["race_id"][-2:]) >= 9]
+        if not _venue_races:
+            st.warning("この会場に9R以降のレースがありません。")
         race_options = {f"{r['race_name']}": r["race_id"] for r in _venue_races}
         default_idx = 0
         if preselected and preselected in race_options.values():
@@ -739,8 +832,26 @@ with tab_race:
         track_condition = meta.get("track_condition", "良")
         st.info(f"**{surface} {distance}m / 馬場: {track_condition}**")
 
-        # 注: db.netkeiba.com はStreamlit Cloudでブロックされているため個別馬取得は無効
-        # 分析はKaggleの1986-2021統計データ(勝率/枠/騎手)をベースに実施
+        # db.netkeiba.com から各馬の過去成績を取得（Cookie設定時のみ）
+        try:
+            _has_cookie = bool(st.secrets.get("netkeiba", {}).get("cookie", ""))
+        except Exception:
+            _has_cookie = True  # scraper.pyに直接設定済み
+        if _has_cookie and entries:
+            _fetch_bar = st.progress(0, text="馬の過去成績を取得中...")
+            for _i, _e in enumerate(entries):
+                _hid = _e.get("horse_id", "")
+                if _hid:
+                    try:
+                        from scraper import fetch_horse_past_results, save_horse_cache
+                        _df_past = fetch_horse_past_results(_hid, _e.get("horse_name", ""))
+                        if not _df_past.empty:
+                            save_horse_cache(_hid, _e.get("horse_name", ""), _df_past)
+                    except Exception as _ex:
+                        pass
+                _fetch_bar.progress((_i + 1) / len(entries), text=f"取得中 {_i+1}/{len(entries)}")
+            _fetch_bar.empty()
+            df_hist = merge_with_horse_cache(df_hist)
     else:
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -914,6 +1025,34 @@ with tab_race:
                 e["short_term_foreign_note"]  = stf["note"]
                 e["is_short_term_foreign"]     = stf["is_short_term"]
 
+                # horse_stats ボーナス（距離適性・道悪・上がり・外国人騎手・コース特性）
+                from horse_stats import get_horse_score_bonus
+                hs_result = get_horse_score_bonus(
+                    horse_name=name.strip(),
+                    horse_stats=horse_stats_df,
+                    distance_cat=dist_cat,
+                    surface=surface,
+                    track_condition=track_condition,
+                    jockey=e.get("jockey", ""),
+                    venue=venue,
+                    running_style=e.get("running_style", "不明"),
+                )
+                e["horse_stats_bonus"]   = hs_result["bonus"]
+                e["horse_stats_details"] = hs_result["details"]
+
+                # 調教スコア
+                _tr_data = st.session_state.get("training_data")
+                if _tr_data:
+                    from training_fetcher import evaluate_training
+                    _tr_eval = evaluate_training(name, _tr_data)
+                    e["training_bonus"]  = _tr_eval["score"]
+                    e["training_label"]  = _tr_eval["label"]
+                    e["training_detail"] = _tr_eval["details"]
+                else:
+                    e["training_bonus"]  = 0.0
+                    e["training_label"]  = "調教未取得"
+                    e["training_detail"] = ""
+
             entries_full = entries_full_bias
 
             # EV評価 → 全補正値が horse dict に入っているのでそのまま渡す
@@ -1061,12 +1200,14 @@ with tab_race:
         # 総合信頼スコアテーブル
         st.subheader("🎯 総合信頼スコア")
         score_cols = ["horse_name", "popularity", "odds", "confidence_score", "confidence_label",
+                      "recommend_reason",
                       "ev", "plus_factors", "running_style", "draw_label",
                       "jockey_change_signal", "rotation_signal", "weight_signal", "romance_danger"]
         score_cols = [c for c in score_cols if c in eval_df.columns]
         rename_score = {
             "horse_name": "馬名", "popularity": "人気", "odds": "単勝",
             "confidence_score": "総合スコア", "confidence_label": "判定",
+            "recommend_reason": "推奨理由",
             "ev": "EV", "plus_factors": "プラス数",
             "running_style": "脚質", "draw_label": "枠",
             "jockey_change_signal": "乗替",
@@ -1179,61 +1320,29 @@ with tab_race:
                 for _, r in fast_longshots.iterrows():
                     st.success(f"⚡ **末脚型穴馬候補: {r['horse_name']}** ({r['popularity']}番人気) — {r['last3f_label']}")
 
-        # ---- 3. 出走間隔カレンダービュー ---- #
-        if "rotation_days" in eval_df.columns:
-            st.divider()
-            st.subheader("📅 出走間隔ビュー")
-            interval_data = []
-            for _, row in eval_df.iterrows():
-                days = row.get("rotation_days")
-                name = row.get("horse_name", "")
-                tataki = row.get("tatakidai_flag", False)
-                sig = row.get("rotation_signal", "")
-                try:
-                    days_int = int(days) if days is not None else None
-                except Exception:
-                    days_int = None
+        # ---- 3. 出走間隔ビュー（rotation_signalをそのまま表示）---- #
+        # 総合スコアに含まれているため、ここでは簡易確認用として表示
+        if "rotation_signal" in eval_df.columns:
+            with st.expander("📅 出走間隔詳細", expanded=False):
+                _int_cols = ["horse_name", "popularity", "rotation_signal", "rotation_days", "rotation_message"]
+                _int_cols = [c for c in _int_cols if c in eval_df.columns]
+                _int_df = eval_df[_int_cols].rename(columns={
+                    "horse_name": "馬名", "popularity": "人気",
+                    "rotation_signal": "ローテ判定", "rotation_days": "間隔(日)",
+                    "rotation_message": "詳細",
+                }).sort_values("人気")
 
-                if days_int is None:
-                    band = "不明"
-                    color_css = "#eeeeee"
-                elif tataki:
-                    band = f"⛔ 叩き1走目 ({days_int}日)"
-                    color_css = "#ffc7ce"
-                elif days_int <= 21:
-                    band = f"連闘・中2週 ({days_int}日)"
-                    color_css = "#ffeb9c"
-                elif days_int <= 56:
-                    band = f"適正間隔 ({days_int}日)"
-                    color_css = "#c6efce"
-                elif days_int <= 84:
-                    band = f"やや間隔空き ({days_int}日)"
-                    color_css = "#ffeb9c"
-                else:
-                    band = f"⛔ 叩き1走目 長期休養明け ({days_int}日)"
-                    color_css = "#ffc7ce"
+                def _color_rot(val):
+                    v = str(val)
+                    if "休養明け" in v or "長期" in v: return "background-color: #ffc7ce"
+                    if "連闘" in v or "中1週" in v:    return "background-color: #ffeb9c"
+                    if "叩き2走目" in v or "標準" in v: return "background-color: #c6efce"
+                    return ""
 
-                interval_data.append({
-                    "馬名": name,
-                    "人気": int(row.get("popularity", 99)),
-                    "間隔": band,
-                    "ローテ評価": sig,
-                })
-            int_df = pd.DataFrame(interval_data).sort_values("人気")
-
-            def color_interval(val):
-                if "叩き1走目" in str(val) or "⛔" in str(val):
-                    return "background-color: #ffc7ce"
-                elif "連闘" in str(val):
-                    return "background-color: #ffeb9c"
-                elif "適正" in str(val):
-                    return "background-color: #c6efce"
-                return ""
-
-            st.dataframe(
-                int_df.style.map(color_interval, subset=["間隔"]),
-                use_container_width=True, hide_index=True,
-            )
+                st.dataframe(
+                    _int_df.style.map(_color_rot, subset=["ローテ判定"]),
+                    use_container_width=True, hide_index=True,
+                )
 
         # 注意馬・注目馬アラート
         comebacks        = eval_df[eval_df["exhaustion_comeback"] == True]   if "exhaustion_comeback"  in eval_df.columns else pd.DataFrame()
@@ -1274,9 +1383,10 @@ with tab_race:
                 st.success(f"🚧 **{row['horse_name']}** — {row.get('hurdle_to_flat_message', '')} ({row['popularity']}番人気)")
 
             # 有力馬撃破実績
-            _sort_col = "beat_bonus" if "beat_bonus" in beaten_horses.columns else beaten_horses.columns[0]
-            for _, row in beaten_horses.sort_values(_sort_col, ascending=False).head(3).iterrows():
-                st.info(f"⚔️ **{row['horse_name']}** — {row.get('beat_label', '')} ({row['popularity']}番人気/{row.get('odds','?')}倍)")
+            if not beaten_horses.empty and len(beaten_horses.columns) > 0:
+                _sort_col = "beat_bonus" if "beat_bonus" in beaten_horses.columns else beaten_horses.columns[0]
+                for _, row in beaten_horses.sort_values(_sort_col, ascending=False).head(3).iterrows():
+                    st.info(f"⚔️ **{row['horse_name']}** — {row.get('beat_label', '')} ({row['popularity']}番人気/{row.get('odds','?')}倍)")
 
             # 回り方向ミスマッチ警告
             for _, row in mismatch_horses.iterrows():
