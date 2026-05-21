@@ -142,20 +142,14 @@ with st.sidebar:
     st.divider()
     st.subheader("📂 過去データ")
 
-    demo_mode = st.toggle("🎮 デモモード（Kaggleデータなしで動作確認）", value=False)
-    if demo_mode:
-        st.info("デモ用サンプルデータを使用中。実際の競馬データではありません。")
-        with st.spinner("サンプルデータ生成中..."):
-            df_hist = generate_demo_race_results(n_rows=3000)
-        st.success(f"✅ デモデータ {len(df_hist):,}件")
+    demo_mode = False  # デモモード廃止
+    with st.spinner("過去データを読み込み中..."):
+        df_hist = load_race_results()
+    if df_hist.empty:
+        st.warning("⚠️ 過去データが読み込まれていません。convert_tfjv.py を実行してください。")
     else:
-        with st.spinner("過去データを読み込み中..."):
-            df_hist = load_race_results()
-        if df_hist.empty:
-            st.warning("⚠️ 過去データCSVなし。デモモードをオンにするか、データが読み込まれるまでお待ちください。")
-        else:
-            df_hist = merge_with_horse_cache(df_hist)
-            st.success(f"✅ {len(df_hist):,}件のレース結果")
+        df_hist = merge_with_horse_cache(df_hist)
+        st.success(f"✅ {len(df_hist):,}件のレース結果")
 
     with st.spinner("統計テーブルを構築中..."):
         win_rate_table  = get_win_rate_table(df_hist)
@@ -1199,21 +1193,45 @@ with tab_race:
 
         # 総合信頼スコアテーブル
         st.subheader("🎯 総合信頼スコア")
-        score_cols = ["horse_name", "popularity", "odds", "confidence_score", "confidence_label",
-                      "recommend_reason",
+
+        # 凡例
+        with st.expander("📖 各列の見方", expanded=False):
+            st.markdown("""
+| 列名 | 意味 |
+|------|------|
+| **総合スコア** | 0〜100点。**75点以上**が買い推奨ライン。緑=高、黄=中、赤=低 |
+| **判定** | ◎◎最強推奨 / ◎強推奨 / ○推奨 / △検討可 / ▲様子見 / ✕見送り |
+| **推奨理由** | プラス要因の要約。EV+は期待値プラス、EV-0.11は期待値マイナス0.11の意味 |
+| **EV** | 期待値。**プラスなら「オッズが馬の実力より高い（割安）」**。0.2以上が理想 |
+| **プラス数** | 14ファクター中何個がプラスか。多いほど信頼度が高い |
+| **脚質** | 逃げ/先行/中団/差し・追込。今日のペース予測と合わせて判断 |
+| **枠** | 内枠有利/外枠不利などのバイアス判定 |
+| **乗替** | 騎手交代の評価。「鞍上強化」はプラス、「鞍上弱化」はマイナス |
+| **ローテ** | 前走からの出走間隔。「叩き2走目」は上昇見込み |
+| **ロマン危険度** | 「なんとなく気になる」だけで買うと損する馬の危険度 |
+""")
+
+        # 並び順切り替え
+        _sort_mode = st.radio("並び順", ["スコア順（推奨）", "枠番順"], horizontal=True, key="score_sort_mode")
+
+        score_cols = ["gate", "horse_name", "jockey", "popularity", "odds",
+                      "confidence_score", "confidence_label", "recommend_reason",
                       "ev", "plus_factors", "running_style", "draw_label",
                       "jockey_change_signal", "rotation_signal", "weight_signal", "romance_danger"]
         score_cols = [c for c in score_cols if c in eval_df.columns]
         rename_score = {
-            "horse_name": "馬名", "popularity": "人気", "odds": "単勝",
+            "gate": "枠番", "horse_name": "馬名", "jockey": "騎手",
+            "popularity": "人気", "odds": "単勝",
             "confidence_score": "総合スコア", "confidence_label": "判定",
             "recommend_reason": "推奨理由",
             "ev": "EV", "plus_factors": "プラス数",
-            "running_style": "脚質", "draw_label": "枠",
+            "running_style": "脚質", "draw_label": "枠バイアス",
             "jockey_change_signal": "乗替",
             "rotation_signal": "ローテ", "weight_signal": "体重",
             "romance_danger": "ロマン危険度",
         }
+
+        _display_df = eval_df.sort_values("gate") if "枠番順" in _sort_mode and "gate" in eval_df.columns else eval_df
 
         def color_score(val):
             try:
@@ -1226,7 +1244,7 @@ with tab_race:
             except Exception:
                 return ""
 
-        show_score_df = eval_df[score_cols].rename(columns=rename_score)
+        show_score_df = _display_df[score_cols].rename(columns=rename_score)
         styled_score = show_score_df.style.map(color_score, subset=["総合スコア"])
         st.dataframe(styled_score, use_container_width=True, hide_index=True)
 
