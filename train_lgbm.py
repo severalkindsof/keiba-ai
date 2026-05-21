@@ -176,7 +176,8 @@ FEATURE_COLS = [
     "horse_weight",     # 馬体重（kg）
     # weight_change は列マッピング不正のため除外（TODO: TFJV列定義確認後に復活）
     # ---- 市場評価 ----
-    "popularity",       # 人気順
+    # popularity は除外: popularityが支配的になり他の特徴量が無効化されるため
+    # EV計算には使うが、モデルの学習には使わない（馬の実力を純粋に評価するため）
     # ---- 直近成績（ローリング特徴量） ----
     "rank_avg3",        # 直近3走の平均着順
     "rank_avg5",        # 直近5走の平均着順

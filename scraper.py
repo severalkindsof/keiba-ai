@@ -116,13 +116,23 @@ def fetch_race_entries(race_id: str) -> list[dict]:
             horse_name = _text(row, ".HorseName")
             jockey = _text(row, ".Jockey")
             weight_carried = _text(row, ".Txt_C")
-            # 枠番は tr の class に "Waku1"〜"Waku8" として入っている
-            gate = 1
+            # 枠番は tr の class に "Waku1"〜"Waku8" または "Waku01"〜"Waku08" として入っている
+            gate = 0
             for cls in row.get("class", []):
-                m = re.match(r"Waku(\d)", cls)
+                m = re.match(r"Waku0*(\d+)", cls)
                 if m:
-                    gate = int(m.group(1))
-                    break
+                    g = int(m.group(1))
+                    if 1 <= g <= 8:
+                        gate = g
+                        break
+            # フォールバック: horse_no から枠番を計算（18頭以下）
+            if gate == 0:
+                try:
+                    hn = int(horse_no)
+                    gate = (hn + 1) // 2 if hn <= 16 else (hn - 14) // 2 + 8
+                    gate = max(1, min(8, gate))
+                except Exception:
+                    gate = 0
             horse_link = row.select_one(".HorseName a")
             horse_id = ""
             if horse_link:
@@ -162,7 +172,10 @@ def _enrich_odds(race_id: str, entries: list[dict]) -> list[dict]:
         # JSONでなければフォールバック（odds/index.htmlから取得）
         return _enrich_odds_fallback(race_id, entries)
 
-    if data.get("status") not in ("middle", "fixed"):
+    # "yoso"（予想）でもデータがあれば使う。"NG"のみフォールバック
+    if data.get("status") == "NG":
+        return _enrich_odds_fallback(race_id, entries)
+    if data.get("status") not in ("middle", "fixed", "yoso"):
         return _enrich_odds_fallback(race_id, entries)
 
     # APIレスポンスのパース
