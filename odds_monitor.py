@@ -49,8 +49,8 @@ def fetch_live_odds(race_id: str) -> dict[str, float]:
                 if odds_val > 0:
                     odds_map[horse_no] = odds_val
             return odds_map
-    except Exception:
-        pass
+    except Exception as _e:
+        print(f"[odds_monitor] API失敗→フォールバック試行: {_e}")
 
     # フォールバック: 出馬表ページのオッズ
     return fetch_odds_from_shutuba(race_id)
@@ -78,7 +78,8 @@ def fetch_odds_from_shutuba(race_id: str) -> dict[str, float]:
                 except Exception:
                     pass
         return odds_map
-    except Exception:
+    except Exception as _e:
+        print(f"[odds_monitor] shutuba取得失敗: {_e}")
         return {}
 
 
@@ -90,8 +91,8 @@ def load_odds_history() -> dict:
     if ODDS_HISTORY_PATH.exists():
         try:
             return json.loads(ODDS_HISTORY_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as _e:
+            print(f"[odds_monitor] odds_history.json 読込失敗: {_e}")
     return {}
 
 
@@ -150,7 +151,7 @@ def detect_odds_signals(race_id: str) -> list[dict]:
             signals.append({
                 "horse":      name,
                 "type":       "急落",
-                "emoji":      "⚡",
+                "emoji":      "",
                 "prev_odds":  prev_odds,
                 "curr_odds":  curr_odds,
                 "change_pct": round(change_rate * 100, 1),
@@ -161,7 +162,7 @@ def detect_odds_signals(race_id: str) -> list[dict]:
             signals.append({
                 "horse":      name,
                 "type":       "急騰",
-                "emoji":      "📈",
+                "emoji":      "",
                 "prev_odds":  prev_odds,
                 "curr_odds":  curr_odds,
                 "change_pct": round(change_rate * 100, 1),
@@ -222,7 +223,7 @@ def get_odds_change_table(race_id: str, horse_names: list[str]) -> pd.DataFrame:
 
 def render_odds_monitor_tab(race_id: str, horse_names: list[str]) -> None:
     """app.py から呼び出すオッズ監視タブ。"""
-    st.subheader("📡 リアルタイム オッズ監視")
+    st.subheader("リアルタイム オッズ監視")
     st.caption("5分ごとに自動取得・急変を検知します（発走1〜2時間前から有効）")
 
     if not race_id:
@@ -233,7 +234,7 @@ def render_odds_monitor_tab(race_id: str, horse_names: list[str]) -> None:
     with col1:
         auto_refresh = st.toggle("自動更新（5分ごと）", value=False, key="odds_auto_refresh")
     with col2:
-        if st.button("🔄 今すぐ取得", key="fetch_odds_now"):
+        if st.button("今すぐ取得", key="fetch_odds_now"):
             _do_fetch_and_record(race_id)
             st.success("取得完了")
 
@@ -244,16 +245,16 @@ def render_odds_monitor_tab(race_id: str, horse_names: list[str]) -> None:
     from discord_notify import render_discord_setup_section, _get_webhook_url
     discord_enabled = bool(_get_webhook_url())
     if discord_enabled:
-        st.caption("🔔 Discord通知: ON（急落検出時に自動送信）")
+        st.caption("Discord通知: ON（急落検出時に自動送信）")
     else:
-        with st.expander("🔕 Discord通知を設定する"):
+        with st.expander("Discord通知を設定する"):
             render_discord_setup_section()
 
     # シグナル表示
     signals = detect_odds_signals(race_id)
     if signals:
         st.divider()
-        st.subheader("🚨 オッズ急変アラート")
+        st.subheader("オッズ急変アラート")
         for sig in signals:
             if sig["type"] == "急落":
                 st.warning(f"{sig['emoji']} {sig['message']}")
@@ -266,13 +267,13 @@ def render_odds_monitor_tab(race_id: str, horse_names: list[str]) -> None:
             from discord_notify import notify_odds_alert
             if notify_odds_alert(signals, race_label):
                 st.session_state[sent_key] = True
-                st.toast("📡 Discord に通知を送信しました", icon="🔔")
+                st.toast("Discord に通知を送信しました", icon="")
     else:
         st.success("急変シグナルなし（正常）")
 
     # オッズ推移テーブル
     st.divider()
-    st.subheader("📊 オッズ推移")
+    st.subheader("オッズ推移")
     change_df = get_odds_change_table(race_id, horse_names)
     if change_df.empty:
         st.info("まだデータがありません。「今すぐ取得」を押してください。")

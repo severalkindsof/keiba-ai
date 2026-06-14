@@ -11,7 +11,6 @@ import pandas as pd
 import numpy as np
 
 # JRA リーディング上位騎手リスト（2024年シーズン基準）
-# 毎年変わるが基本的なトップ層は固定
 TOP_JOCKEYS = {
     "C.ルメール", "川田将雅", "横山武史", "戸崎圭太", "松山弘平",
     "福永祐一", "M.デムーロ", "岩田康誠", "中山雄太", "吉田隼人",
@@ -19,11 +18,21 @@ TOP_JOCKEYS = {
     "坂井瑠星", "北村友一", "横山和生", "団野大成", "西村淳也",
 }
 
+# NEW-5: 海外短期免許騎手（強化評価）
+FOREIGN_SHORT_JOCKEYS = [
+    "レーン", "ディー", "モレイラ", "ピース", "シュタルケ", "ビュイック",
+    "マクドナルド", "テータム", "ヒューズ",
+    # 第40波: 主要海外短期を補強（ヴェルテンベルク前走で実在確認した「キング」含む）
+    "キング", "ムーア", "マーカンド", "スミヨン", "バルザローナ",
+    "Ｃ．デム", "C.デム", "ボウマン", "マーフィー",
+]
+
 APPRENTICE_SUFFIX = ("見習い", "▲")  # 見習い騎手の識別
 
 
 def is_top_jockey(name: str) -> bool:
-    return any(top in name for top in TOP_JOCKEYS)
+    # 双方向マッチング: 「戸崎圭太」in「戸崎圭」も「戸崎圭」in「戸崎圭太」もチェック
+    return any(top in name or name in top for top in TOP_JOCKEYS)
 
 
 def analyze_jockey_change(
@@ -71,22 +80,41 @@ def analyze_jockey_change(
     prev_is_top = is_top_jockey(prev_jockey) if prev_jockey else False
     curr_is_top = is_top_jockey(current_jockey)
 
+    # NEW-5: 海外短期免許騎手への乗り替わりは最強化評価
+    curr_is_foreign = any(f in current_jockey for f in FOREIGN_SHORT_JOCKEYS)
+    if curr_is_foreign:
+        return {
+            "signal": "外国人強化",
+            "bonus": 0.030,
+            "message": f"{prev_jockey or '?'} → {current_jockey}（海外短期騎手への乗り替わり）",
+        }
+
+    # 第40波: 海外短期 → 日本人テン乗りは「差し戻し」で大幅減点。
+    # ユーザー経験則「海外一流は馬の実力を120%引き出す。日本人テン乗りに替わると
+    # 100%すら出せない差し戻しが頻発」を実装。
+    # ※お手馬戻り(rode_before=True)は上の「手戻り」分岐で先にプラス処理されるため、
+    #   ここに到達するのはテン乗り(過去未騎乗)のみ。
+    prev_is_foreign = any(f in prev_jockey for f in FOREIGN_SHORT_JOCKEYS) if prev_jockey else False
+    if prev_is_foreign and not curr_is_foreign:
+        return {
+            "signal": "外国人→日本人差し戻し",
+            "bonus": -0.030,
+            "message": f"{prev_jockey} → {current_jockey}（海外短期→日本人テン乗り：実力差し戻し懸念）",
+        }
+
     if curr_is_top and not prev_is_top:
-        # 強化：リーディング上位騎手への乗り替わり
         return {
             "signal": "鞍上強化",
             "bonus": 0.025,
             "message": f"{prev_jockey or '?'} → {current_jockey}（リーディング上位への強化）",
         }
     elif prev_is_top and not curr_is_top:
-        # 弱化：トップ騎手から格下騎手へ
         return {
             "signal": "鞍上弱化",
             "bonus": -0.02,
             "message": f"{prev_jockey} → {current_jockey}（鞍上弱化、理由を要確認）",
         }
     else:
-        # 初騎乗 or 同格乗り替わり
         bonus = 0.005 if curr_is_top else 0.0
         return {
             "signal": "初騎乗",
@@ -192,7 +220,8 @@ def get_jockey_change_for_field(
         current_jockey = h2.get("jockey", "")
 
         if not df_hist.empty and "horse_name" in df_hist.columns and name:
-            hist = df_hist[df_hist["horse_name"] == name]
+            # A-4: strip()で空白/encoding差異による不一致を防ぐ
+            hist = df_hist[df_hist["horse_name"].str.strip() == name.strip()]
             if "date" in df_hist.columns:
                 hist = hist.sort_values("date", ascending=False)
             hist = hist.head(10)

@@ -24,10 +24,11 @@ HEADERS = {
 }
 REQUEST_INTERVAL = 3  # 秒
 
-# netkeiba 認証Cookie（直接設定 or secrets.toml から読み込み）
-_nk_cookie = "TlRBMU5USTFOdz09"  # ローカル用
+# netkeiba 認証Cookie — st.secrets["netkeiba"]["cookie"] からのみ読み込む
+# （ISSUE-7: ハードコードを撤廃。流出リスク・期限切れリスクを排除）
+_nk_cookie = ""
 try:
-    _nk_cookie = st.secrets["netkeiba"]["cookie"] or _nk_cookie
+    _nk_cookie = st.secrets["netkeiba"]["cookie"] or ""
 except Exception:
     pass
 if _nk_cookie:
@@ -47,53 +48,116 @@ def _get(url: str) -> BeautifulSoup | None:
         time.sleep(REQUEST_INTERVAL)
         resp = requests.get(url, headers=HEADERS, timeout=15)
         resp.raise_for_status()
-        resp.encoding = resp.apparent_encoding
+        # 第45波: race_list_sub.html などUTF-8化に対応するためmeta charset自動検出
+        # 旧来のEUC-JPページも meta から検出できれば正しく扱える
+        import re as _re
+        m = _re.search(rb'charset=["\']?([\w\-]+)', resp.content[:1024], _re.IGNORECASE)
+        if m:
+            resp.encoding = m.group(1).decode("ascii", errors="ignore").strip().upper()
+        else:
+            resp.encoding = "EUC-JP"  # 旧来動作のフォールバック
         return BeautifulSoup(resp.text, "lxml")
     except Exception as e:
         print(f"[scraper] 失敗: {url}: {e}")
         return None
 
 
-@st.cache_data(ttl=1800)
+# BUG-X5: TTL 4階層統一（60秒=直前オッズ / 900=レース固有 / 3600=日次 / 86400=履歴）
+@st.cache_data(ttl=900)
 def fetch_today_races(target_date: str | None = None) -> list[dict]:
     """
     指定日（YYYYMMDD）の重賞レース一覧を取得する。
     デフォルトは今日。
-    返す dict: {race_id, race_name, venue, race_no, date_str}
+    返す dict: {race_id, race_name, date_str}
     """
     if target_date is None:
         target_date = date.today().strftime("%Y%m%d")
 
-    # race_list_sub.html を使用（race_list.htmlはJS動的生成に変更されたため）
-    url = f"https://race.netkeiba.com/top/race_list_sub.html?kaisai_date={target_date}"
-    soup = _get(url)
-    if soup is None:
-        return []
-
     JRA_VENUE_CODES = {str(i).zfill(2) for i in range(1, 11)}
-
     seen = set()
     races = []
-    # shutuba.html?race_id=... のリンクを取得（重複除外）
-    for a in soup.select("a[href*='shutuba.html'][href*='race_id']"):
-        href = a.get("href", "")
-        m = re.search(r"race_id=(\d{12})", href)
-        if not m:
+
+    # race_list_sub.html → race_list.html の順でフォールバック
+    urls = [
+        f"https://race.netkeiba.com/top/race_list_sub.html?kaisai_date={target_date}",
+        f"https://race.netkeiba.com/top/race_list.html?kaisai_date={target_date}",
+    ]
+    for url in urls:
+        soup = _get(url)
+        if soup is None:
             continue
-        race_id = m.group(1)
-        if race_id in seen:
-            continue
-        seen.add(race_id)
-        venue_code = race_id[4:6]
-        if venue_code not in JRA_VENUE_CODES:
-            continue  # 地方競馬をスキップ
-        name = a.get_text(strip=True).split("\n")[0].strip()
-        races.append({
-            "race_id": race_id,
-            "race_name": name,
-            "date_str": target_date,
-        })
+        # shutuba.html 限定 → race_id を含む全リンクへ拡張（ページ構造変化に対応）
+        for sel in ["a[href*='shutuba.html'][href*='race_id']", "a[href*='race_id']"]:
+            for a in soup.select(sel):
+                href = a.get("href", "")
+                m = re.search(r"race_id=(\d{12})", href)
+                if not m:
+                    continue
+                race_id = m.group(1)
+                if race_id in seen:
+                    continue
+                seen.add(race_id)
+                venue_code = race_id[4:6]
+                if venue_code not in JRA_VENUE_CODES:
+                    continue  # 地方競馬をスキップ
+                name = a.get_text(strip=True).split("\n")[0].strip()
+                races.append({
+                    "race_id":   race_id,
+                    "race_name": name,
+                    "date_str":  target_date,
+                })
+            if races:
+                break  # セレクタでヒットしたら次のセレクタは試さない
+        # デバッグ出力（ターミナルで確認可能）
+        if not races:
+            _title = soup.title.string if soup.title else "no-title"
+            _nlinks = len(soup.select("a[href*='race_id']"))
+            print(f"[scraper] {url} → title={_title!r}, race_id_links={_nlinks}, found=0")
+        if races:
+            break  # URLでヒットしたら次のURLは試さない
     return races
+
+
+def get_race_id_from_venue_date(venue: str, date_str: str, race_no: int | str) -> str | None:
+    """
+    NEW-7: 会場名・日付・レース番号から race_id を自動取得する。
+    netkeibaのレース一覧ページをスクレイピングして race_id を逆引き。
+
+    Args:
+        venue:    会場名（"東京", "阪神" 等）
+        date_str: "YYYY-MM-DD" または "YYYYMMDD"
+        race_no:  レース番号（整数 or 文字列）
+    Returns:
+        12桁の race_id、見つからなければ None
+    """
+    try:
+        yyyymmdd = date_str.replace("-", "")
+        races = fetch_today_races(yyyymmdd)
+        if not races:
+            return None
+
+        # race_no を2桁ゼロ埋め文字列に変換
+        rno_str = str(int(race_no)).zfill(2)
+
+        # netkeiba の race_id 形式: YYYY(4) + 会場コード(2) + 開催回(2) + 開催日(2) + レース番号(2)
+        # レース番号は下2桁で判定
+        for r in races:
+            rid = str(r.get("race_id", ""))
+            if len(rid) == 12 and rid[10:12] == rno_str:
+                # 会場名が一致するか確認（会場コードで比較）
+                vname = str(r.get("race_name", ""))
+                if venue in vname or not venue:
+                    return rid
+
+        # 会場名マッチなしの場合はレース番号のみで返す（最初にマッチしたもの）
+        for r in races:
+            rid = str(r.get("race_id", ""))
+            if len(rid) == 12 and rid[10:12] == rno_str:
+                return rid
+
+        return None
+    except Exception:
+        return None
 
 
 @st.cache_data(ttl=900)  # 15分キャッシュ（オッズ変動を考慮）
@@ -139,6 +203,17 @@ def fetch_race_entries(race_id: str) -> list[dict]:
                 m_id = re.search(r"/horse/(\w+)", horse_link.get("href", ""))
                 if m_id:
                     horse_id = m_id.group(1)
+            # 馬体重（発表後）: "500(+2)" のような形式から先頭3〜4桁を抽出
+            horse_weight = 0
+            hw_el = row.select_one(".Weight")
+            if hw_el:
+                hw_txt = hw_el.get_text(strip=True)
+                m_hw = re.search(r"(\d{3,4})", hw_txt)
+                if m_hw:
+                    try:
+                        horse_weight = int(m_hw.group(1))
+                    except Exception:
+                        horse_weight = 0
             entries.append({
                 "horse_no": horse_no,
                 "horse_name": horse_name,
@@ -149,27 +224,42 @@ def fetch_race_entries(race_id: str) -> list[dict]:
                 "odds": 10.0,
                 "sire": "",
                 "horse_id": horse_id,
+                "horse_weight": horse_weight,
             })
         except Exception:
             continue
 
     # オッズを別ページから補完
     entries = _enrich_odds(race_id, entries)
-    # 空の horse_name エントリを除去（HTML誤パース行）
-    entries = [e for e in entries if e.get("horse_name")]
+    # LATENT-4: 空の horse_name / horse_no エントリを除去（HTML誤パース行 + odds hit失敗防止）
+    entries = [e for e in entries if e.get("horse_name") and str(e.get("horse_no", "")).strip()]
     return entries
 
 
-def _enrich_odds(race_id: str, entries: list[dict]) -> list[dict]:
-    """race.netkeiba.com の APIから単勝オッズ・人気を取得する"""
-    import json as _json
-    url = f"https://race.netkeiba.com/api/api_get_jra_odds.html?race_id={race_id}&type=1&action=update"
+def _fetch_odds_api(race_id: str, type_code: int, timeout: float = 10):
+    """単一のオッズAPI呼び出し（並列化用に分離）"""
+    url = f"https://race.netkeiba.com/api/api_get_jra_odds.html?race_id={race_id}&type={type_code}&action=update"
     try:
-        time.sleep(REQUEST_INTERVAL)
-        r = requests.get(url, headers=HEADERS, timeout=10)
-        data = r.json()
+        return requests.get(url, headers=HEADERS, timeout=timeout).json()
     except Exception:
-        # JSONでなければフォールバック（odds/index.htmlから取得）
+        return None
+
+
+def _enrich_odds(race_id: str, entries: list[dict]) -> list[dict]:
+    """race.netkeiba.com の APIから単勝・複勝オッズを並列取得（LATENT-19）"""
+    from concurrent.futures import ThreadPoolExecutor
+    time.sleep(REQUEST_INTERVAL)  # 全体のリクエスト間隔は維持
+    try:
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            f_tansho = ex.submit(_fetch_odds_api, race_id, 1, 10)   # 単勝
+            # A-1 BUGFIX: 複勝は type=2（type=5 はワイド）
+            f_fukusho = ex.submit(_fetch_odds_api, race_id, 2, 8)   # 複勝
+            data = f_tansho.result()
+            dp   = f_fukusho.result()
+    except Exception:
+        return _enrich_odds_fallback(race_id, entries)
+
+    if data is None:
         return _enrich_odds_fallback(race_id, entries)
 
     # "yoso"（予想）でもデータがあれば使う。"NG"のみフォールバック
@@ -178,31 +268,121 @@ def _enrich_odds(race_id: str, entries: list[dict]) -> list[dict]:
     if data.get("status") not in ("middle", "fixed", "yoso"):
         return _enrich_odds_fallback(race_id, entries)
 
-    # APIレスポンスのパース
-    # odds = {"1": {"01": ["オッズ", "", "人気順位"], "02": [...], ...}}
     try:
         odds_dict = data["data"].get("odds", {})
         tansho = odds_dict.get("1", {})  # type=1 が単勝
+
+        # 複勝オッズの結果（並列取得済み・A-1 修正：type=2 が複勝）
+        fukusho = {}
+        if dp and dp.get("status") in ("middle", "fixed", "yoso"):
+            fukusho = dp.get("data", {}).get("odds", {}).get("2", {})
 
         for e in entries:
             umaban = str(e.get("horse_no", "")).zfill(2)
             row = tansho.get(umaban)
             if row and len(row) >= 1:
+                # ISSUE-4: 取得成功時のみ値を入れ、失敗時は odds_confirmed=False で None 維持
                 try:
-                    e["odds"] = float(row[0]) if row[0] and row[0] != "---" else 10.0
+                    if row[0] and row[0] != "---":
+                        e["odds"] = float(row[0])
+                        e["odds_confirmed"] = True
+                    else:
+                        e["odds"] = 10.0
+                        e["odds_confirmed"] = False
                 except Exception:
                     e["odds"] = 10.0
+                    e["odds_confirmed"] = False
                 try:
                     e["popularity"] = int(row[2]) if len(row) >= 3 and row[2] else 9
                 except Exception:
                     e["popularity"] = 9
             else:
+                # オッズ API ヒット失敗 → 暫定値 + 未確定マーキング
                 if e.get("odds") is None:       e["odds"] = 10.0
                 if e.get("popularity") is None: e["popularity"] = 9
+                e["odds_confirmed"] = False
+
+            # 複勝オッズ（min〜max の範囲）
+            prow = fukusho.get(umaban)
+            if prow and len(prow) >= 2:
+                try:
+                    e["place_odds_min"] = float(prow[0]) if prow[0] and prow[0] != "---" else None
+                    e["place_odds_max"] = float(prow[1]) if prow[1] and prow[1] != "---" else None
+                    # 中間値を place_odds として使用
+                    if e["place_odds_min"] and e["place_odds_max"]:
+                        e["place_odds"] = round((e["place_odds_min"] + e["place_odds_max"]) / 2, 1)
+                except Exception:
+                    pass
     except Exception:
         return _enrich_odds_fallback(race_id, entries)
 
     return entries
+
+
+# BUG-X5: 多券種オッズは直前変動最重要 → 60秒
+@st.cache_data(ttl=60)
+def fetch_multi_odds(race_id: str) -> dict:
+    """
+    多券種オッズを並列取得：馬連(4) / 馬単(6) / 三連複(7) / 三連単(8)
+
+    Returns:
+        {
+            "quinella":  {"01-02": 12.3, ...},    # 馬連 (key: "min-max" zero-padded)
+            "exacta":    {"01-02": 18.5, ...},    # 馬単 (key: "first-second" zero-padded)
+            "trio":      {"01-02-03": 45.2, ...}, # 三連複
+            "trifecta":  {"01-02-03": 245.0, ...},# 三連単
+        }
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    time.sleep(REQUEST_INTERVAL)
+    result = {"quinella": {}, "exacta": {}, "trio": {}, "trifecta": {}}
+    try:
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            futs = {
+                "quinella": ex.submit(_fetch_odds_api, race_id, 4, 12),
+                "exacta":   ex.submit(_fetch_odds_api, race_id, 6, 12),
+                "trio":     ex.submit(_fetch_odds_api, race_id, 7, 15),
+                "trifecta": ex.submit(_fetch_odds_api, race_id, 8, 15),
+            }
+            data_by = {k: f.result() for k, f in futs.items()}
+    except Exception:
+        return result
+
+    type_codes = {"quinella": "4", "exacta": "6", "trio": "7", "trifecta": "8"}
+    for ticket_name, data in data_by.items():
+        if not data or data.get("status") not in ("middle", "fixed", "yoso"):
+            continue
+        try:
+            tc = type_codes[ticket_name]
+            raw = data.get("data", {}).get("odds", {}).get(tc, {})
+            for combo_key, row in raw.items():
+                # API のキーは "01-02-03" 形式 or "010203" 連結（券種により）
+                # row は典型的に [odds_str, "0", popularity]
+                if not row:
+                    continue
+                try:
+                    odds_val = float(row[0]) if row[0] and row[0] != "---" else None
+                except Exception:
+                    odds_val = None
+                if odds_val is None:
+                    continue
+                # キー正規化：連結→ハイフン区切り
+                if "-" not in combo_key and combo_key.isdigit():
+                    digits = combo_key
+                    chunk = 2
+                    parts = [digits[i:i+chunk] for i in range(0, len(digits), chunk)]
+                    combo_key = "-".join(parts)
+                elif "-" in combo_key:
+                    # 第35波 (G4): "1-2-3" 形式をゼロ埋め "01-02-03" に統一
+                    # （Harville タブ照合キーと不一致 → 市場オッズが静かに不発見）
+                    try:
+                        combo_key = "-".join(p.zfill(2) for p in combo_key.split("-"))
+                    except Exception:
+                        pass
+                result[ticket_name][combo_key] = odds_val
+        except Exception:
+            continue
+    return result
 
 
 def _enrich_odds_fallback(race_id: str, entries: list[dict]) -> list[dict]:
@@ -233,6 +413,9 @@ def _enrich_odds_fallback(race_id: str, entries: list[dict]) -> list[dict]:
         info = odds_map.get(str(e.get("horse_no", "")), {})
         e["odds"]       = info.get("odds", 10.0)
         e["popularity"] = info.get("popularity", 9)
+        # 第35波 (G3): フォールバック経路で odds_confirmed が未付与だと
+        # BUG-C の無効化（暫定オッズ馬の EV/buy 遮断）をすり抜けていた
+        e["odds_confirmed"] = "odds" in info
     return entries
 
 
@@ -340,24 +523,41 @@ def fetch_horse_sire(horse_id: str) -> str:
 @st.cache_data(ttl=900)
 def fetch_race_meta(race_id: str) -> dict:
     """
-    レースのメタ情報（距離・馬場・馬場状態・会場）を取得する
+    レースのメタ情報（距離・馬場・馬場状態・会場・レース名）を取得する。
+    取得失敗 or 必須項目欠落時は空 dict を返す（呼び出し側でガード必須）。
     """
     url = f"https://race.netkeiba.com/race/shutuba.html?race_id={race_id}"
     soup = _get(url)
     if soup is None:
         return {}
     try:
+        # race_id の[4:6]から会場名を逆引き
+        venue_code = race_id[4:6] if len(race_id) >= 6 else ""
+        code_to_venue = {v: k for k, v in VENUE_CODES.items()}
+        venue = code_to_venue.get(venue_code, "")
+
         race_data = soup.select_one("div.RaceData01")
         if not race_data:
             return {}
         text = race_data.get_text()
         distance_m = re.search(r"(\d{3,4})m", text)
-        surface = "芝" if "芝" in text else "ダート" if "ダート" in text else "芝"
+        if not distance_m:
+            return {}  # 距離が取れないならメタ取得失敗とみなす
+        surface = "芝" if "芝" in text else ("ダート" if ("ダート" in text or "ダ" in text) else "")
+        if not surface:
+            return {}
         condition_m = re.search(r"(良|稍重|重|不良)", text)
+
+        # レース名（RaceName 内）
+        race_name_el = soup.select_one("div.RaceName") or soup.select_one(".RaceName")
+        race_name = race_name_el.get_text(strip=True) if race_name_el else ""
+
         return {
-            "distance": int(distance_m.group(1)) if distance_m else 2000,
+            "distance": int(distance_m.group(1)),
             "surface": surface,
             "track_condition": condition_m.group(1) if condition_m else "良",
+            "venue": venue,
+            "race_name": race_name,
         }
     except Exception:
         return {}
@@ -517,3 +717,185 @@ def manual_entry_template() -> list[dict]:
         }
         for i in range(1, 9)
     ]
+
+
+# ============================================================
+# C-5 (第12波): 当日の終了済みレース結果取得（intraday time_bias 用）
+# ============================================================
+@st.cache_data(ttl=300)  # 5分キャッシュ（当日結果は逐次更新されるため短め）
+def fetch_today_finished_results(date_str: str, venue: str) -> list[dict]:
+    """
+    指定日（YYYYMMDD）・会場のうち、既に終了したレースの結果を返す。
+
+    Returns:
+        list of dict: [{race_no, distance, surface, finish_time_sec, winner_horse_no,
+                        winner_corner4_pos, field_size, track_condition}, ...]
+    """
+    venue_code = VENUE_CODES.get(venue)
+    if not venue_code:
+        return []
+    # netkeiba 当日結果一覧
+    url = f"https://race.netkeiba.com/top/race_list.html?kaisai_date={date_str}"
+    soup = _get(url)
+    if soup is None:
+        return []
+
+    # 会場コードを含む race_id だけ抽出
+    race_ids: list[str] = []
+    seen: set[str] = set()
+    for a in soup.select("a[href*='race_id']"):
+        m = re.search(r"race_id=(\d{12})", a.get("href", ""))
+        if not m:
+            continue
+        rid = m.group(1)
+        if rid in seen:
+            continue
+        if rid[4:6] != venue_code:
+            continue
+        seen.add(rid)
+        race_ids.append(rid)
+
+    results: list[dict] = []
+    for rid in race_ids:
+        meta = _fetch_race_result_brief(rid)
+        if meta is None:
+            continue
+        results.append(meta)
+    return results
+
+
+def _fetch_race_result_brief(race_id: str) -> dict | None:
+    """単一レースの結果サマリ（1着馬の情報のみ）を取得。未終了レースは None。
+
+    (第20波 U3 修正) セレクタを race_diary.fetch_race_result_from_netkeiba で
+    実証済みの `table.RaceTable01 tr.HorseList` 方式に統一。
+    旧実装の `tr.Rank01` は誤りで、常に None を返し当日補正が機能しなかった。
+    """
+    url = f"https://race.netkeiba.com/race/result.html?race_id={race_id}"
+    soup = _get(url)
+    if soup is None:
+        return None
+    rank1_cells = None
+    for row in soup.select("table.RaceTable01 tr.HorseList"):
+        cells = row.find_all("td")
+        if len(cells) < 8:
+            continue
+        if cells[0].get_text(strip=True) == "1":
+            rank1_cells = cells
+            break
+    if rank1_cells is None:
+        # 未終了 or パース失敗
+        return None
+    try:
+        tds = [c.get_text(strip=True) for c in rank1_cells]
+        horse_no = int(tds[2]) if tds[2].isdigit() else None
+        time_str = tds[7] if len(tds) > 7 else ""
+        finish_sec = None
+        m = re.match(r"(\d+):(\d+)\.(\d+)", time_str)
+        if m:
+            finish_sec = int(m.group(1)) * 60 + int(m.group(2)) + int(m.group(3)) / 10.0
+        # コーナー通過順（"4-3-2-1" 形式のセルを探して最後を取る）
+        corner4 = None
+        for t in tds:
+            if re.match(r"^[\d\-]+$", t) and "-" in t:
+                parts = t.split("-")
+                if parts[-1].isdigit():
+                    corner4 = int(parts[-1])
+                    break
+    except Exception:
+        return None
+    # 距離・surface・field_size はレース見出しから
+    title = soup.select_one("div.RaceData01, .RaceData01")
+    distance = None
+    surface = None
+    track_cond = None
+    field_size = None
+    if title:
+        ttxt = title.get_text(" ", strip=True)
+        dm = re.search(r"(芝|ダ|障)(\d{3,4})m", ttxt)
+        if dm:
+            surface = {"芝": "芝", "ダ": "ダート", "障": "障害"}[dm.group(1)]
+            distance = int(dm.group(2))
+        cm = re.search(r"馬場:(良|稍重|重|不良)", ttxt)
+        if cm:
+            track_cond = cm.group(1)
+        fm = re.search(r"(\d+)頭", ttxt)
+        if fm:
+            field_size = int(fm.group(1))
+    return {
+        "race_id": race_id,
+        "race_no": int(race_id[-2:]),
+        "distance": distance,
+        "surface": surface,
+        "track_condition": track_cond,
+        "field_size": field_size,
+        "finish_time_sec": finish_sec,
+        "winner_horse_no": horse_no,
+        "winner_corner4_pos": corner4,
+    }
+
+
+# ============================================================
+# 第40波: 初ブリンカーアラート — 「新聞」タブ(shutuba_past.html)から
+# ブリンカー装着馬を自動取得。実HTML構造を安田記念で確認済み:
+#   span.Mark にテキスト "B" を持つ行の a[href*='/horse/'] が装着馬。
+#   さらに各馬の過去5走欄に B が無ければ「初装着の可能性」と判定。
+# ============================================================
+@st.cache_data(ttl=900)
+def fetch_blinker_horses(race_id: str) -> dict:
+    """
+    出馬表「新聞」タブからブリンカー装着馬を取得。
+    Returns: {"all": [馬名...], "first_time": [初装着の可能性がある馬名...]}
+    """
+    url = f"https://race.netkeiba.com/race/shutuba_past.html?race_id={race_id}"
+    soup = _get(url)
+    if soup is None:
+        return {"all": [], "first_time": []}
+    all_b, first_b = [], []
+    seen = set()
+    for row in soup.select("tr.HorseList"):
+        name_el = row.select_one("a[href*='/horse/']")
+        if not name_el:
+            continue
+        name = name_el.get_text(strip=True)
+        if not name or name in seen:
+            continue
+        # 現在のブリンカー: 馬名セル（先頭近く）の span.Mark に "B"
+        marks = [m.get_text(strip=True) for m in row.select("span.Mark")]
+        has_b = "B" in marks
+        if not has_b:
+            continue
+        seen.add(name)
+        all_b.append(name)
+        # 第40波修正: shutuba_past の B マークは「初/通常」の区別がHTMLに無い
+        # （netkeibaはCSSで色付けしているだけ）。全馬の行内B数=1個で同一。
+        # → 自動での「初」判定は不可能と確定。装着馬リストのみ返し、
+        # 「初」判定は UI 側でユーザーがチェックする方式に変更。
+        # first_b リストは互換のため空のまま返す。
+    return {"all": all_b, "first_time": first_b}
+
+
+def fetch_blinkers_for_date(date_str: str, venue: str | None = None,
+                             min_race_no: int = 1) -> list[dict]:
+    """
+    指定日の全レース（min_race_no 以降）のブリンカー装着馬をまとめて取得。
+    Returns: [{race_id, venue, race_no, all:[...], first_time:[...]}, ...]
+    """
+    races = fetch_today_races(date_str)
+    out = []
+    for r in races:
+        rid = r.get("race_id", "")
+        if len(rid) != 12:
+            continue
+        rno = int(rid[-2:])
+        if rno < min_race_no:
+            continue
+        if venue:
+            vcode = VENUE_CODES.get(venue)
+            if vcode and rid[4:6] != vcode:
+                continue
+        b = fetch_blinker_horses(rid)
+        if b["all"]:
+            out.append({"race_id": rid, "race_no": rno,
+                        "all": b["all"], "first_time": b["first_time"]})
+    return out

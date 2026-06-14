@@ -168,8 +168,8 @@ def main():
 
     print(f"\n完了: 取得成功 {total_ok}頭 / 失敗 {total_fail}頭")
     if total_ok == 0 and total_fail > 0:
-        print("ERROR: 全馬取得失敗 → GitHubからもdb.netkeiba.comがブロックされている可能性")
-        sys.exit(1)
+        print("WARN: 全馬取得失敗（db.netkeiba.comがブロックされている可能性）")
+        # ワークフローは失敗扱いにしない（正常終了）
 
 
 if __name__ == "__main__":

@@ -49,7 +49,7 @@ def check_structural_reasons(horse: dict) -> dict:
             "structural_count": 0,
             "romance_risk": "対象外（人気馬）",
             "verdict": "人気馬",
-            "verdict_emoji": "🔵",
+            "verdict_emoji": "",
             "reasons": [],
             "warnings": [],
             "summary": "7番人気未満のため穴馬判定対象外",
@@ -60,23 +60,23 @@ def check_structural_reasons(horse: dict) -> dict:
     est_wr  = float(horse.get("est_win_rate", 0)) / 100
     distortion = float(horse.get("odds_distortion", 0))
     if ev > 0:
-        reasons.append(f"✅ EV+（{ev:+.3f}）：市場が過小評価している可能性")
+        reasons.append(f"EV+（{ev:+.3f}）：市場が過小評価している可能性")
     elif distortion > 2.0:
-        reasons.append(f"✅ オッズ歪み+{distortion:.1f}%：推定勝率がオッズより高い")
+        reasons.append(f"オッズ歪み+{distortion:.1f}%：推定勝率がオッズより高い")
     else:
-        warnings.append(f"❌ EVマイナス（{ev:+.3f}）：市場評価の方が高い")
+        warnings.append(f"EVマイナス（{ev:+.3f}）：市場評価の方が高い")
 
     # ---- 根拠②：クラスドロップ ---- #
     class_signal = horse.get("class_signal", "")
     if "クラスドロップ" in str(class_signal):
-        reasons.append(f"✅ {class_signal}：能力的に格上の馬が割安で出走")
+        reasons.append(f"{class_signal}：能力的に格上の馬が割安で出走")
     elif "クラスアップ" in str(class_signal):
-        warnings.append(f"⚠️ {class_signal}：格上挑戦は割引")
+        warnings.append(f"{class_signal}：格上挑戦は割引")
 
     # ---- 根拠③：前走位置取りミス ---- #
     if horse.get("position_mismatch_flag"):
         msg = horse.get("position_correction_msg", "")
-        reasons.append(f"✅ 前走展開負け：{msg[:40] if msg else '位置取りミス検出'}")
+        reasons.append(f"前走展開負け：{msg[:40] if msg else '位置取りミス検出'}")
 
     # ---- 根拠④：ペース・バイアス適合 ---- #
     pace_b = float(horse.get("pace_benefit", 0))
@@ -88,9 +88,9 @@ def check_structural_reasons(horse: dict) -> dict:
         if pace_b > 0:       details.append(f"ペース展開+{pace_b:.3f}")
         if bias_b > 0:       details.append(f"当日バイアス+{bias_b:.3f}")
         if draw_b > 0:       details.append(f"枠順+{draw_b:.3f}")
-        reasons.append(f"✅ 展開・コース条件がハマる（{', '.join(details)}）")
+        reasons.append(f"展開・コース条件がハマる（{', '.join(details)}）")
     elif layout_total < -0.02:
-        warnings.append(f"❌ 展開・コース条件が向かない（合計{layout_total:+.3f}）")
+        warnings.append(f"展開・コース条件が向かない（合計{layout_total:+.3f}）")
 
     # ---- 根拠⑤：血統・ニックス適性 ---- #
     nicks_b = float(horse.get("nicks_bonus", 0))
@@ -103,34 +103,34 @@ def check_structural_reasons(horse: dict) -> dict:
         if nicks_b > 0.01 and nicks_label: parts.append(nicks_label[:20])
         if season_b > 0:  parts.append(f"季節適性+{season_b:.3f}")
         if cond_b > 0:    parts.append(f"馬場適性+{cond_b:.3f}")
-        reasons.append(f"✅ 血統・適性マッチ（{', '.join(parts)}）")
+        reasons.append(f"血統・適性マッチ（{', '.join(parts)}）")
     elif bloodline_total < -0.02:
-        warnings.append(f"❌ 血統・適性が合っていない（{bloodline_total:+.3f}）")
+        warnings.append(f"血統・適性が合っていない（{bloodline_total:+.3f}）")
 
     # ---- 根拠⑥：調教タイム ---- #
     training_score = horse.get("training_score")
     training_label = horse.get("training_label", "")
     if training_score is not None:
         if int(training_score) >= 75:
-            reasons.append(f"✅ 調教良好：{training_label}")
+            reasons.append(f"調教良好：{training_label}")
         elif int(training_score) <= 40:
-            warnings.append(f"❌ 調教物足りない：{training_label}")
+            warnings.append(f"調教物足りない：{training_label}")
 
     # ---- 根拠⑦：騎手乗り替わり ---- #
     jockey_signal = horse.get("jockey_change_signal", "")
     jockey_msg    = horse.get("jockey_change_msg", "")
     if jockey_signal in ("鞍上強化", "手戻り"):
-        reasons.append(f"✅ {jockey_signal}：{jockey_msg[:40] if jockey_msg else ''}")
+        reasons.append(f"{jockey_signal}：{jockey_msg[:40] if jockey_msg else ''}")
     elif jockey_signal == "鞍上弱化":
-        warnings.append(f"❌ {jockey_signal}：{jockey_msg[:40] if jockey_msg else ''}")
+        warnings.append(f"{jockey_signal}：{jockey_msg[:40] if jockey_msg else ''}")
 
     # ---- 前走レースレベル ---- #
     race_level_label = horse.get("race_level_label", "")
     race_level_b     = float(horse.get("race_level_bonus", 0))
     if race_level_b > 0.01:
-        reasons.append(f"✅ {race_level_label[:40]}")
+        reasons.append(f"{race_level_label[:40]}")
     elif race_level_b < -0.01:
-        warnings.append(f"⚠️ {race_level_label[:40]}")
+        warnings.append(f"{race_level_label[:40]}")
 
     # ---- 判定 ---- #
     n_reasons  = len(reasons)
@@ -138,23 +138,23 @@ def check_structural_reasons(horse: dict) -> dict:
 
     if n_reasons >= 4:
         verdict       = "◎ 構造的穴馬（買い推奨）"
-        verdict_emoji = "🟢"
+        verdict_emoji = ""
         romance_risk  = "低（複数の根拠あり）"
     elif n_reasons >= 3:
         verdict       = "○ 根拠ある穴馬（検討推奨）"
-        verdict_emoji = "🟡"
+        verdict_emoji = ""
         romance_risk  = "中"
     elif n_reasons >= 2:
         verdict       = "△ 弱い根拠の穴馬（慎重に）"
-        verdict_emoji = "🟠"
+        verdict_emoji = ""
         romance_risk  = "高"
     elif n_reasons >= 1 and ev > -0.1:
         verdict       = "▲ ロマン要素あり（見送りも可）"
-        verdict_emoji = "🟠"
+        verdict_emoji = ""
         romance_risk  = "高"
     else:
         verdict       = "✕ ロマン買い（根拠なし）"
-        verdict_emoji = "🔴"
+        verdict_emoji = ""
         romance_risk  = "極高（見送り推奨）"
 
     # ---- 3行サマリー生成 ---- #
@@ -190,10 +190,10 @@ def _generate_summary(
     lines = [f"**{horse_name}**（{popularity}番人気/{odds}倍）：{verdict}"]
 
     if reasons:
-        top_reason = reasons[0].replace("✅ ", "")
+        top_reason = reasons[0].replace("", "")
         lines.append(f"最大の根拠：{top_reason[:60]}")
     if warnings:
-        top_warning = warnings[0].replace("❌ ", "").replace("⚠️ ", "")
+        top_warning = warnings[0].replace("", "").replace("", "")
         lines.append(f"注意点：{top_warning[:60]}")
     elif n_reasons >= 3:
         lines.append(f"根拠が{n_reasons}つ重なっており、市場の過小評価が疑われます。")
@@ -223,9 +223,14 @@ def evaluate_all_longshots(eval_df: pd.DataFrame) -> pd.DataFrame:
     # DataFrameに結合（dict列は除外）
     simple_cols = ["is_longshot", "structural_count", "warning_count",
                    "romance_risk", "verdict", "verdict_emoji", "summary"]
+    # 第45波: eval_df 側に既に verdict 等があると concat で重複カラム化 → plotly でエラー
+    # 重複を避けるため eval_df 側の同名カラムを先に落とす
+    base = eval_df.reset_index(drop=True).drop(
+        columns=[c for c in simple_cols if c in eval_df.columns],
+        errors="ignore",
+    )
     out = pd.concat(
-        [eval_df.reset_index(drop=True),
-         result_df[simple_cols].reset_index(drop=True)],
+        [base, result_df[simple_cols].reset_index(drop=True)],
         axis=1,
     )
     return out

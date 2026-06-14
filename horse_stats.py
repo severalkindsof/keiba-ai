@@ -10,9 +10,8 @@ horse_stats.py
 - コース直線長から差し有利判定
 """
 import pandas as pd
-import numpy as np
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path  # CLEAN: numpy 未使用のため削除
 
 # ============================================================
 # コース直線長テーブル（メートル）

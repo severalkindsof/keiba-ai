@@ -190,7 +190,7 @@ def analyze_surface_change(
                 'signal': '初芝転向',
                 'bonus': 0.015,
                 'is_surface_change': True,
-                'message': '🔄 初芝転向：市場がダート馬として評価 → 芝適性が過小評価されやすい穴候補',
+                'message': '初芝転向：市場がダート馬として評価 → 芝適性が過小評価されやすい穴候補',
             }
         elif len(current_surf_hist) >= 2:
             # 芝の実績あり→芝適性を確認
@@ -212,7 +212,7 @@ def analyze_surface_change(
                     'signal': '初ダート転向（芝で実績薄）',
                     'bonus': 0.01,
                     'is_surface_change': True,
-                    'message': '🔄 初ダート：芝で結果が出なかった馬の一変の可能性あり',
+                    'message': '初ダート：芝で結果が出なかった馬の一変の可能性あり',
                 }
 
     return {

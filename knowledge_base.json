@@ -1,7 +1,6 @@
 {
   "_comment": "ユーザーの競馬知識ベース。アプリ内のエディタから編集できます。",
   "version": "1.0",
-
   "special_signals": [
     {
       "id": "g1_blinker",
@@ -28,172 +27,289 @@
       "note": "変な馬場になったら森の外国馬が来る"
     }
   ],
-
   "jockey_patterns": [
     {
       "jockey": "菅原明良",
-      "conditions": [{"gate_outer": true, "gate_number": 8}],
+      "conditions": [
+        {
+          "gate_outer": true,
+          "gate_number": 8
+        }
+      ],
       "action": "buy",
       "bonus": 0.025,
       "note": "8枠大外の菅原→買い◎"
     },
     {
       "jockey": "横山武史",
-      "conditions": [{"venue": "中山"}],
+      "conditions": [
+        {
+          "venue": "中山"
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "中山の武史はガチ。皐月賞と有馬記念は得意"
     },
     {
       "jockey": "団野大成",
-      "conditions": [{"venue": "京都", "surface": "芝"}],
+      "conditions": [
+        {
+          "venue": "京都",
+          "surface": "芝"
+        }
+      ],
       "action": "buy",
       "bonus": 0.03,
       "note": "京都芝の団野は最低人気でも買う"
     },
     {
       "jockey": "団野大成",
-      "conditions": [{"distance_max": 1400}],
+      "conditions": [
+        {
+          "distance_max": 1400
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "短距離は団野"
     },
     {
       "jockey": "吉田豊",
-      "conditions": [{"running_style": "逃げ"}],
+      "conditions": [
+        {
+          "running_style": "逃げ"
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "吉田豊は逃げ馬で"
     },
     {
       "jockey": "木幡拓也",
-      "conditions": [{"venue": "東京", "surface": "ダート", "distance_min": 1800}],
+      "conditions": [
+        {
+          "venue": "東京",
+          "surface": "ダート",
+          "distance_min": 1800
+        }
+      ],
       "action": "buy",
       "bonus": 0.03,
       "note": "木幡拓也は府中のダート中長距離（特に2100m）でマジで買える"
     },
     {
       "jockey": "木幡巧也",
-      "conditions": [{"gate_inner": true}],
+      "conditions": [
+        {
+          "gate_inner": true
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "内枠の木幡巧"
     },
     {
       "jockey": "田辺裕信",
-      "conditions": [{"venue_list": ["中山", "東京", "福島"], "surface": "ダート"}],
+      "conditions": [
+        {
+          "venue_list": [
+            "中山",
+            "東京",
+            "福島"
+          ],
+          "surface": "ダート"
+        }
+      ],
       "action": "buy",
       "bonus": 0.025,
       "note": "田辺→中山と東京のダート、福島"
     },
     {
       "jockey": "田辺裕信",
-      "conditions": [{"venue": "中山", "surface": "芝", "distance_min": 2000}],
+      "conditions": [
+        {
+          "venue": "中山",
+          "surface": "芝",
+          "distance_min": 2000
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "田辺→中山芝2000以上、特に2200"
     },
     {
       "jockey": "川田将雅",
-      "conditions": [{"venue": "中京", "surface": "芝", "distance": 2000}],
+      "conditions": [
+        {
+          "venue": "中京",
+          "surface": "芝",
+          "distance": 2000
+        }
+      ],
       "action": "buy",
       "bonus": 0.03,
       "note": "中京芝2000の川田。特に中内田×川田×牝馬"
     },
     {
       "jockey": "武豊",
-      "conditions": [{"race_name_contains": "チューリップ"}],
+      "conditions": [
+        {
+          "race_name_contains": "チューリップ"
+        }
+      ],
       "action": "buy",
       "bonus": 0.03,
       "note": "チューリップ：武豊"
     },
     {
       "jockey": "横山和生",
-      "conditions": [{"venue": "阪神"}],
+      "conditions": [
+        {
+          "venue": "阪神"
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "横山和生は阪神"
     },
     {
       "jockey": "北村友一",
-      "conditions": [{"venue": "京都", "course_type": "outer"}],
+      "conditions": [
+        {
+          "venue": "京都",
+          "course_type": "outer"
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "北村友一京都外回りやたら上手い"
     },
     {
       "jockey": "北村宏司",
-      "conditions": [{"venue": "中京", "surface": "芝", "distance_max": 1400}],
+      "conditions": [
+        {
+          "venue": "中京",
+          "surface": "芝",
+          "distance_max": 1400
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "中京芝1400は北村"
     },
     {
       "jockey": "斎藤新",
-      "conditions": [{"turn_direction": "left"}],
+      "conditions": [
+        {
+          "turn_direction": "left"
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "斎藤新は左回り"
     },
     {
       "jockey": "川須栄彦",
-      "conditions": [{"distance_max": 1400, "gate_inner": true}],
+      "conditions": [
+        {
+          "distance_max": 1400,
+          "gate_inner": true
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "川須は短距離内枠で買え"
     },
     {
       "jockey": "丹内祐次",
-      "conditions": [{"venue": "小倉"}],
+      "conditions": [
+        {
+          "venue": "小倉"
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "小倉の丹内"
     },
     {
       "jockey": "藤岡佑介",
-      "conditions": [{"venue": "小倉"}],
+      "conditions": [
+        {
+          "venue": "小倉"
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "小倉の藤岡佑"
     },
     {
       "jockey": "小林美駒",
-      "conditions": [{"distance_max": 1400, "weight_carried_max": 53, "running_style": "逃げ", "popularity_min": 7}],
+      "conditions": [
+        {
+          "distance_max": 1400,
+          "weight_carried_max": 53,
+          "running_style": "逃げ",
+          "popularity_min": 7
+        }
+      ],
       "action": "buy",
       "bonus": 0.04,
       "note": "1400m以下の小林美駒の逃げ馬（斤量53kg以下）は絶対に買う。人気薄なら尚更熱い"
     },
     {
       "jockey": "石川倭",
-      "conditions": [{"popularity_min": 7}],
+      "conditions": [
+        {
+          "popularity_min": 7
+        }
+      ],
       "action": "buy",
       "bonus": 0.03,
       "note": "石川倭騎手は超うまい、人気薄を頭に持ってくる"
     },
     {
       "jockey": "吉村誠之助",
-      "conditions": [{"popularity_min": 7}],
+      "conditions": [
+        {
+          "popularity_min": 7
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "吉村誠之助は穴党に"
     },
     {
       "jockey": "菊沢一樹",
-      "conditions": [{"popularity_min": 7}],
+      "conditions": [
+        {
+          "popularity_min": 7
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "菊沢は穴馬"
     },
     {
       "jockey": "原優介",
-      "conditions": [{"surface": "ダート", "popularity_min": 7, "running_style": "差し・追込"}],
+      "conditions": [
+        {
+          "surface": "ダート",
+          "popularity_min": 7,
+          "running_style": "差し・追込"
+        }
+      ],
       "action": "buy",
       "bonus": 0.025,
       "note": "ダートの原は人気薄で追い込み"
     },
     {
       "jockey": "高杉皓平",
-      "conditions": [{"distance_min": 1800}],
+      "conditions": [
+        {
+          "distance_min": 1800
+        }
+      ],
       "action": "buy",
       "bonus": 0.02,
       "note": "高杉は1800以上"
@@ -201,8 +317,16 @@
     {
       "jockey": "藤懸貴志",
       "conditions": [
-        {"surface": "ダート", "running_style": "逃げ", "course_type": "opening_week"},
-        {"popularity_min": 10, "surface_change": "芝→ダート", "running_style": "逃げ"}
+        {
+          "surface": "ダート",
+          "running_style": "逃げ",
+          "course_type": "opening_week"
+        },
+        {
+          "popularity_min": 10,
+          "surface_change": "芝→ダート",
+          "running_style": "逃げ"
+        }
       ],
       "action": "buy",
       "bonus": 0.03,
@@ -210,184 +334,801 @@
     },
     {
       "jockey": "小橋勝太",
-      "conditions": [{"venue": "東京", "surface": "ダート", "turn_count": 1, "distance_min": 1800}],
+      "conditions": [
+        {
+          "venue": "東京",
+          "surface": "ダート",
+          "turn_count": 1,
+          "distance_min": 1800
+        }
+      ],
       "action": "buy",
       "bonus": 0.025,
       "note": "小橋勝太は東京ワンターンダート1800以上でプラス"
     },
-    {"jockey": "池添謙一", "conditions": [{"race_class": "G1,G2,G3"}], "action": "avoid", "bonus": -0.025, "note": "重賞の池添は消し"},
-    {"jockey": "田口貫太", "conditions": [{"race_class": "G1,G2,G3"}], "action": "avoid", "bonus": -0.025, "note": "重賞の田口は消し"},
-    {"jockey": "藤岡佑介", "conditions": [{"race_class": "G1,G2,G3"}], "action": "avoid", "bonus": -0.02, "note": "重賞の藤岡佑は消し（小倉除く）"},
-    {"jockey": "浜中俊", "conditions": [{"race_class": "G1,G2,G3"}], "action": "avoid", "bonus": -0.02, "note": "重賞の浜中は消し"},
-    {"jockey": "三浦皇成", "conditions": [{"race_class": "G1"}], "action": "avoid", "bonus": -0.025, "note": "G1の三浦は消し"},
-    {"jockey": "松岡正海", "conditions": [{}], "action": "avoid", "bonus": -0.015, "note": "松岡は基本消し（腹を括った穴なら別）"}
+    {
+      "jockey": "池添謙一",
+      "conditions": [
+        {
+          "race_class": "G1,G2,G3"
+        }
+      ],
+      "action": "avoid",
+      "bonus": -0.025,
+      "note": "重賞の池添は消し"
+    },
+    {
+      "jockey": "田口貫太",
+      "conditions": [
+        {
+          "race_class": "G1,G2,G3"
+        }
+      ],
+      "action": "avoid",
+      "bonus": -0.025,
+      "note": "重賞の田口は消し"
+    },
+    {
+      "jockey": "藤岡佑介",
+      "conditions": [
+        {
+          "race_class": "G1,G2,G3"
+        }
+      ],
+      "action": "avoid",
+      "bonus": -0.02,
+      "note": "重賞の藤岡佑は消し（小倉除く）"
+    },
+    {
+      "jockey": "浜中俊",
+      "conditions": [
+        {
+          "race_class": "G1,G2,G3"
+        }
+      ],
+      "action": "avoid",
+      "bonus": -0.02,
+      "note": "重賞の浜中は消し"
+    },
+    {
+      "jockey": "三浦皇成",
+      "conditions": [
+        {
+          "race_class": "G1"
+        }
+      ],
+      "action": "avoid",
+      "bonus": -0.025,
+      "note": "G1の三浦は消し"
+    },
+    {
+      "jockey": "松岡正海",
+      "conditions": [
+        {}
+      ],
+      "action": "avoid",
+      "bonus": -0.015,
+      "note": "松岡は基本消し（腹を括った穴なら別）"
+    }
   ],
-
   "jockey_change_patterns": [
-    {"from_jockeys": ["鮫島克駿", "三浦皇成", "柴田裕一"], "action": "buy", "bonus": 0.02, "note": "鮫島・三浦・柴田裕からの乗り替わりはチャンス"},
-    {"from_jockeys": ["大野拓弥"], "to_jockey": "木幡巧也", "action": "buy", "bonus": 0.03, "note": "大野拓也→木幡巧の乗り替わり"},
-    {"jockey": "武豊", "condition": "second_ride", "action": "buy", "bonus": 0.025, "note": "武豊の乗り替わり2戦目"}
+    {
+      "from_jockeys": [
+        "鮫島克駿",
+        "三浦皇成",
+        "柴田裕一"
+      ],
+      "action": "buy",
+      "bonus": 0.02,
+      "note": "鮫島・三浦・柴田裕からの乗り替わりはチャンス"
+    },
+    {
+      "from_jockeys": [
+        "大野拓弥"
+      ],
+      "to_jockey": "木幡巧也",
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "大野拓也→木幡巧の乗り替わり"
+    },
+    {
+      "jockey": "武豊",
+      "condition": "second_ride",
+      "action": "buy",
+      "bonus": 0.025,
+      "note": "武豊の乗り替わり2戦目"
+    }
   ],
-
   "trainer_jockey_combos": [
-    {"jockey": "岩田康誠", "trainer_contains": "昆", "action": "buy", "bonus": 0.02, "note": "ノリは昆厩舎の時に買う"},
-    {"jockey": "岩田康誠", "trainer_contains": "ミッキー", "action": "buy", "bonus": 0.02, "note": "ノリはミッキー厩舎も"},
-    {"jockey": "岩田康誠", "conditions": [{"venue": "中山", "race_class": "G2"}], "action": "buy", "bonus": 0.03, "note": "中山G2のノリは買え"},
-    {"jockey": "角田大和", "trainer_contains": "石橋", "action": "buy", "bonus": 0.03, "note": "角田大和の石橋厩舎で穴開ける"},
-    {"jockey": "西村淳也", "trainer_contains": "杉山", "conditions": [{"venue": "中京"}], "action": "buy", "bonus": 0.025, "note": "西村×杉山厩舎は中京で中穴"},
-    {"trainer_contains": "友道", "conditions": [{"surface": "芝", "race_class": "G1,G2,G3", "distance_min": 1800, "distance_max": 2400}], "action": "buy", "bonus": 0.02, "note": "芝重賞1800〜2400の友道厩舎は考えずに買う"}
+    {
+      "jockey": "岩田康誠",
+      "trainer_contains": "昆",
+      "action": "buy",
+      "bonus": 0.02,
+      "note": "ノリは昆厩舎の時に買う"
+    },
+    {
+      "jockey": "岩田康誠",
+      "trainer_contains": "ミッキー",
+      "action": "buy",
+      "bonus": 0.02,
+      "note": "ノリはミッキー厩舎も"
+    },
+    {
+      "jockey": "岩田康誠",
+      "conditions": [
+        {
+          "venue": "中山",
+          "race_class": "G2"
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "中山G2のノリは買え"
+    },
+    {
+      "jockey": "角田大和",
+      "trainer_contains": "石橋",
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "角田大和の石橋厩舎で穴開ける"
+    },
+    {
+      "jockey": "西村淳也",
+      "trainer_contains": "杉山",
+      "conditions": [
+        {
+          "venue": "中京"
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.025,
+      "note": "西村×杉山厩舎は中京で中穴"
+    },
+    {
+      "trainer_contains": "友道",
+      "conditions": [
+        {
+          "surface": "芝",
+          "race_class": "G1,G2,G3",
+          "distance_min": 1800,
+          "distance_max": 2400
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.02,
+      "note": "芝重賞1800〜2400の友道厩舎は考えずに買う"
+    }
   ],
-
   "sire_patterns": [
-    {"sire": "ロードカナロア", "conditions": [{"race_class": "G1"}, {"distance_max": 1400}], "action": "buy", "bonus": 0.03, "note": "G1ではカナロアを買え。距離短縮でも強い"},
-    {"sire": "ロードカナロア", "conditions": [{"venue": "中山", "distance": 1600}], "action": "buy", "bonus": 0.025, "note": "中山マイルのカナロア"},
-    {"sire": "ロードカナロア", "conditions": [{"venue": "東京", "surface": "芝", "horse_age_max": 3, "distance": 1600}], "action": "buy", "bonus": 0.025, "note": "東京1600の3歳戦でカナロアなら抑える"},
-    {"sire": "モーリス", "conditions": [{"venue": "東京", "distance": 1800}], "action": "buy", "bonus": 0.02, "note": "東京1800はモーリス買っていい"},
-    {"sire": "モーリス", "conditions": [{"venue": "東京", "race_class": "G1"}], "action": "avoid", "bonus": -0.03, "note": "府中G1でモーリス産駒は勝ったことない"},
-    {"sire": "スクリーンヒーロー", "conditions": [{"venue": "東京", "distance": 1800}], "action": "avoid", "bonus": -0.02, "note": "東京1800mはスクリーンヒーロー苦手"},
-    {"sire": "ダイワメジャー", "conditions": [{"distance_min": 1800}], "action": "avoid", "bonus": -0.015, "note": "ダイワメジャーに1800mは長すぎる"},
-    {"sire": "シャンハイボビー", "conditions": [{"venue": "福島", "surface": "ダート", "distance_list": [1150, 1700]}], "action": "buy", "bonus": 0.03, "note": "シャンハイボビー：福島ダート1150, 1700"},
-    {"sire": "サンダースノー", "conditions": [{"surface": "ダート", "distance_list": [1400, 1800, 2000], "month_min": 11, "horse_age_max": 3}], "action": "buy", "bonus": 0.03, "note": "サンダースノー産駒：11月以降ダート1400, 1800, 2000で3歳未勝利"},
-    {"sire": "マジェスティックウォリアー", "conditions": [{"venue": "札幌", "surface": "ダート", "distance_list": [1000, 1700]}], "action": "buy", "bonus": 0.035, "note": "札幌ダート1000, 1700はマジェスティックウォリアー産駒"},
-    {"sire": "ラブリーデイ", "conditions": [{"venue_list": ["新潟", "札幌"]}], "action": "buy", "bonus": 0.03, "note": "ラブリーデイ産駒は新潟・札幌の芝ダート共にビタ買い"},
-    {"sire": "ラブリーデイ", "conditions": [{"venue": "小倉", "surface": "芝"}], "action": "buy", "bonus": 0.025, "note": "ラブリーデイ産駒→小倉の芝"},
-    {"sire": "ヴァンセンヌ", "conditions": [{"surface": "ダート", "venue_type": "local"}], "action": "buy", "bonus": 0.03, "note": "ヴァンセンヌ産駒はローカルのダートベタ買い"},
-    {"sire": "シルバーステート", "conditions": [{"venue": "京都", "surface": "芝", "distance": 1800, "month_list": [9,10,11]}], "action": "buy", "bonus": 0.03, "note": "シルバーステート産駒→秋の京都1800"},
-    {"sire": "シルバーステート", "conditions": [{"venue": "福島", "surface": "ダート", "distance": 1150}], "action": "buy", "bonus": 0.025, "note": "シルバーステート→福島1150ダート"},
-    {"sire": "シルバーステート", "conditions": [{"venue": "東京", "turn_count": 1}], "action": "buy", "bonus": 0.025, "note": "東京ワンターンのシルバーステート"},
-    {"sire": "キズナ", "conditions": [{"venue": "中京", "surface": "ダート", "distance": 1800, "sex": "牝"}], "action": "buy", "bonus": 0.035, "note": "キズナ産駒♀は中京ダート1800"},
-    {"sire": "アメリカンファラオ", "conditions": [{"surface": "ダート", "distance_max": 2000}], "action": "buy", "bonus": 0.03, "note": "アメリカンファラオ産駒：ダートの神（2000以下）"},
-    {"sire": "シニスターミニスター", "conditions": [{"venue": "中京", "distance_max": 1800, "distance_change": "short"}], "action": "buy", "bonus": 0.04, "note": "シニスターミニスター：中京1800以下×距離短縮組が大幅プラス"},
-    {"sire": "シニスターミニスター", "conditions": [{"venue": "中山", "surface": "ダート", "distance": 1800, "track_condition_bad": true}], "action": "buy", "bonus": 0.03, "note": "シニスターミニスター：道悪×中山1800は大幅プラス"},
-    {"sire": "ホッコータルマエ", "conditions": [{"surface": "ダート", "sex": "牝", "distance_max": 1600}], "action": "buy", "bonus": 0.025, "note": "ホッコータルマエ産駒→ダート牝馬の1600以下"},
-    {"sire": "ルヴァンスレーヴ", "conditions": [{"surface": "ダート", "distance_min": 1700, "race_class": "新馬"}], "action": "buy", "bonus": 0.035, "note": "ルヴァンスレーヴ産駒→1700以上のダート新馬（特に内枠）"},
-    {"sire": "コパノリッキー", "conditions": [{"venue": "東京", "surface": "ダート", "distance": 1600}], "action": "buy", "bonus": 0.03, "note": "東京ダート1600はコパノリッキーが穴"},
-    {"sire": "ヴィクトワールピサ", "conditions": [{"venue_list": ["東京", "阪神", "中京"], "surface": "芝"}], "action": "buy", "bonus": 0.025, "note": "ヴィクトワールピサ産駒→東京・阪神・中京の芝（新馬も）"},
-    {"sire": "スワーヴリチャード", "conditions": [{"venue": "京都", "surface": "芝", "distance_list": [1600, 2000, 3000]}], "action": "buy", "bonus": 0.03, "note": "スワーヴリチャード産駒→京都芝1600, 2000, 3000"},
-    {"sire": "ゴールドシップ", "conditions": [{"venue": "中山", "distance": 1800}], "action": "buy", "bonus": 0.025, "note": "中山1800mを勝ったゴールドシップ産駒は出世する説"},
-    {"sire": "ゴールドシップ", "conditions": [{"venue": "東京", "opening_week": true}], "action": "buy", "bonus": 0.025, "note": "東京開幕したばかりのゴルシ産駒の強さはガチ"},
-    {"sire": "レイデオロ", "conditions": [{"race_class": "G1,G2,G3", "popularity_min": 6}], "action": "buy", "bonus": 0.03, "note": "重賞のレイデオロ産駒は実力以上に評価されないから毎回妙味あり"}
+    {
+      "sire": "ロードカナロア",
+      "conditions": [
+        {
+          "race_class": "G1"
+        },
+        {
+          "distance_max": 1400
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "G1ではカナロアを買え。距離短縮でも強い"
+    },
+    {
+      "sire": "ロードカナロア",
+      "conditions": [
+        {
+          "venue": "中山",
+          "distance": 1600
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.025,
+      "note": "中山マイルのカナロア"
+    },
+    {
+      "sire": "ロードカナロア",
+      "conditions": [
+        {
+          "venue": "東京",
+          "surface": "芝",
+          "horse_age_max": 3,
+          "distance": 1600
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.025,
+      "note": "東京1600の3歳戦でカナロアなら抑える"
+    },
+    {
+      "sire": "モーリス",
+      "conditions": [
+        {
+          "venue": "東京",
+          "distance": 1800
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.02,
+      "note": "東京1800はモーリス買っていい"
+    },
+    {
+      "sire": "モーリス",
+      "conditions": [
+        {
+          "venue": "東京",
+          "race_class": "G1"
+        }
+      ],
+      "action": "avoid",
+      "bonus": -0.03,
+      "note": "府中G1でモーリス産駒は勝ったことない"
+    },
+    {
+      "sire": "スクリーンヒーロー",
+      "conditions": [
+        {
+          "venue": "東京",
+          "distance": 1800
+        }
+      ],
+      "action": "avoid",
+      "bonus": -0.02,
+      "note": "東京1800mはスクリーンヒーロー苦手"
+    },
+    {
+      "sire": "ダイワメジャー",
+      "conditions": [
+        {
+          "distance_min": 1800
+        }
+      ],
+      "action": "avoid",
+      "bonus": -0.015,
+      "note": "ダイワメジャーに1800mは長すぎる"
+    },
+    {
+      "sire": "シャンハイボビー",
+      "conditions": [
+        {
+          "venue": "福島",
+          "surface": "ダート",
+          "distance_list": [
+            1150,
+            1700
+          ]
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "シャンハイボビー：福島ダート1150, 1700"
+    },
+    {
+      "sire": "サンダースノー",
+      "conditions": [
+        {
+          "surface": "ダート",
+          "distance_list": [
+            1400,
+            1800,
+            2000
+          ],
+          "month_min": 11,
+          "horse_age_max": 3
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "サンダースノー産駒：11月以降ダート1400, 1800, 2000で3歳未勝利"
+    },
+    {
+      "sire": "マジェスティックウォリアー",
+      "conditions": [
+        {
+          "venue": "札幌",
+          "surface": "ダート",
+          "distance_list": [
+            1000,
+            1700
+          ]
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.035,
+      "note": "札幌ダート1000, 1700はマジェスティックウォリアー産駒"
+    },
+    {
+      "sire": "ラブリーデイ",
+      "conditions": [
+        {
+          "venue_list": [
+            "新潟",
+            "札幌"
+          ]
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "ラブリーデイ産駒は新潟・札幌の芝ダート共にビタ買い"
+    },
+    {
+      "sire": "ラブリーデイ",
+      "conditions": [
+        {
+          "venue": "小倉",
+          "surface": "芝"
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.025,
+      "note": "ラブリーデイ産駒→小倉の芝"
+    },
+    {
+      "sire": "ヴァンセンヌ",
+      "conditions": [
+        {
+          "surface": "ダート",
+          "venue_type": "local"
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "ヴァンセンヌ産駒はローカルのダートベタ買い"
+    },
+    {
+      "sire": "シルバーステート",
+      "conditions": [
+        {
+          "venue": "京都",
+          "surface": "芝",
+          "distance": 1800,
+          "month_list": [
+            9,
+            10,
+            11
+          ]
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "シルバーステート産駒→秋の京都1800"
+    },
+    {
+      "sire": "シルバーステート",
+      "conditions": [
+        {
+          "venue": "福島",
+          "surface": "ダート",
+          "distance": 1150
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.025,
+      "note": "シルバーステート→福島1150ダート"
+    },
+    {
+      "sire": "シルバーステート",
+      "conditions": [
+        {
+          "venue": "東京",
+          "turn_count": 1
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.025,
+      "note": "東京ワンターンのシルバーステート"
+    },
+    {
+      "sire": "キズナ",
+      "conditions": [
+        {
+          "venue": "中京",
+          "surface": "ダート",
+          "distance": 1800,
+          "sex": "牝"
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.035,
+      "note": "キズナ産駒♀は中京ダート1800"
+    },
+    {
+      "sire": "アメリカンファラオ",
+      "conditions": [
+        {
+          "surface": "ダート",
+          "distance_max": 2000
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "アメリカンファラオ産駒：ダートの神（2000以下）"
+    },
+    {
+      "sire": "シニスターミニスター",
+      "conditions": [
+        {
+          "venue": "中京",
+          "distance_max": 1800,
+          "distance_change": "short"
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.04,
+      "note": "シニスターミニスター：中京1800以下×距離短縮組が大幅プラス"
+    },
+    {
+      "sire": "シニスターミニスター",
+      "conditions": [
+        {
+          "venue": "中山",
+          "surface": "ダート",
+          "distance": 1800,
+          "track_condition_bad": true
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "シニスターミニスター：道悪×中山1800は大幅プラス"
+    },
+    {
+      "sire": "ホッコータルマエ",
+      "conditions": [
+        {
+          "surface": "ダート",
+          "sex": "牝",
+          "distance_max": 1600
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.025,
+      "note": "ホッコータルマエ産駒→ダート牝馬の1600以下"
+    },
+    {
+      "sire": "ルヴァンスレーヴ",
+      "conditions": [
+        {
+          "surface": "ダート",
+          "distance_min": 1700,
+          "race_class": "新馬"
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.035,
+      "note": "ルヴァンスレーヴ産駒→1700以上のダート新馬（特に内枠）"
+    },
+    {
+      "sire": "コパノリッキー",
+      "conditions": [
+        {
+          "venue": "東京",
+          "surface": "ダート",
+          "distance": 1600
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "東京ダート1600はコパノリッキーが穴"
+    },
+    {
+      "sire": "ヴィクトワールピサ",
+      "conditions": [
+        {
+          "venue_list": [
+            "東京",
+            "阪神",
+            "中京"
+          ],
+          "surface": "芝"
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.025,
+      "note": "ヴィクトワールピサ産駒→東京・阪神・中京の芝（新馬も）"
+    },
+    {
+      "sire": "スワーヴリチャード",
+      "conditions": [
+        {
+          "venue": "京都",
+          "surface": "芝",
+          "distance_list": [
+            1600,
+            2000,
+            3000
+          ]
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "スワーヴリチャード産駒→京都芝1600, 2000, 3000"
+    },
+    {
+      "sire": "ゴールドシップ",
+      "conditions": [
+        {
+          "venue": "中山",
+          "distance": 1800
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.025,
+      "note": "中山1800mを勝ったゴールドシップ産駒は出世する説"
+    },
+    {
+      "sire": "ゴールドシップ",
+      "conditions": [
+        {
+          "venue": "東京",
+          "opening_week": true
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.025,
+      "note": "東京開幕したばかりのゴルシ産駒の強さはガチ"
+    },
+    {
+      "sire": "レイデオロ",
+      "conditions": [
+        {
+          "race_class": "G1,G2,G3",
+          "popularity_min": 6
+        }
+      ],
+      "action": "buy",
+      "bonus": 0.03,
+      "note": "重賞のレイデオロ産駒は実力以上に評価されないから毎回妙味あり"
+    }
   ],
-
   "race_specific_patterns": [
     {
       "race_name": "フェアリーS",
       "pattern": "1枠1番",
       "note": "フェアリーS（1枠1番）は荒れやすい",
       "action": "upset_warning",
-      "checklist": ["1枠1番の馬を要確認"]
+      "checklist": [
+        "1枠1番の馬を要確認"
+      ]
     },
     {
       "race_name": "NHKマイルC",
       "note": "爆荒れ。10〜11番人気、府中重賞で上がり最速、ファルコンS組は来る、NZT組は軽視、フレンチデピュティ血統",
       "action": "upset_warning",
-      "checklist": ["10〜11番人気を確認", "府中重賞で上がり最速の馬", "ファルコンS組に注目", "NZT組は軽視", "フレンチデピュティ血統"]
+      "checklist": [
+        "10〜11番人気を確認",
+        "府中重賞で上がり最速の馬",
+        "ファルコンS組に注目",
+        "NZT組は軽視",
+        "フレンチデピュティ血統"
+      ]
     },
     {
       "race_name": "高松宮記念",
       "note": "晴れたら内、雨なら外。父ロードカナロア×母父サクラバクシンオー",
       "action": "conditional",
-      "checklist": ["晴れ→内枠有利", "雨→外枠有利", "父カナロア×母父サクラバクシンオーに注目"]
+      "checklist": [
+        "晴れ→内枠有利",
+        "雨→外枠有利",
+        "父カナロア×母父サクラバクシンオーに注目"
+      ]
     },
     {
       "race_name": "フェブラリーS",
       "note": "ドバイで騎手不在→府中巧者を狙え",
       "action": "buy_pattern",
-      "checklist": ["ドバイ期間は有力騎手が不在", "府中ダート巧者に注目"]
+      "checklist": [
+        "ドバイ期間は有力騎手が不在",
+        "府中ダート巧者に注目"
+      ]
     },
     {
       "race_name": "桜花賞",
       "note": "460kg未満は切り。阪神JFを信じろ",
       "action": "conditional",
-      "checklist": ["460kg未満は切り", "阪神JF組を優先"]
+      "checklist": [
+        "460kg未満は切り",
+        "阪神JF組を優先"
+      ]
     },
     {
       "race_name": "皐月賞",
       "note": "共同通信杯はマスト",
       "action": "buy_pattern",
-      "checklist": ["共同通信杯組に必ずマーク"]
+      "checklist": [
+        "共同通信杯組に必ずマーク"
+      ]
     },
     {
       "race_name": "菊花賞",
       "note": "ルメールとラジニケ勝馬がくる",
       "action": "buy_pattern",
-      "checklist": ["ルメール騎乗馬を注目", "ラジオニッポン賞の勝馬"]
+      "checklist": [
+        "ルメール騎乗馬を注目",
+        "ラジオニッポン賞の勝馬"
+      ]
     },
     {
       "race_name": "スプリングS",
       "note": "深く考えずに父の中山1800実績だけ見て買えば当たるレース",
       "action": "buy_pattern",
-      "checklist": ["父の中山1800実績だけで判断"]
+      "checklist": [
+        "父の中山1800実績だけで判断"
+      ]
     },
     {
       "race_name": "大阪杯",
       "note": "関西勢のみで考える",
       "action": "filter",
-      "checklist": ["関西馬（栗東所属）のみを対象"]
+      "checklist": [
+        "関西馬（栗東所属）のみを対象"
+      ]
     },
     {
       "race_name": "VM",
       "note": "中山牝馬Sが前哨戦",
       "action": "buy_pattern",
-      "checklist": ["中山牝馬S組に注目"]
+      "checklist": [
+        "中山牝馬S組に注目"
+      ]
     },
     {
       "race_name": "アルゼンチン共和国杯",
       "note": "ここを勝つ馬はジャパンカップと春天で狙える",
       "action": "future_note",
-      "checklist": ["勝馬はJC・春天でリピーター狙い"]
+      "checklist": [
+        "勝馬はJC・春天でリピーター狙い"
+      ]
     },
     {
       "race_name": "毎日杯",
       "note": "1:46.5秒以内で勝つならG1級",
       "action": "quality_flag",
-      "checklist": ["タイム1:46.5以内→G1級の評価"]
+      "checklist": [
+        "タイム1:46.5以内→G1級の評価"
+      ]
     }
   ],
-
   "upset_race_conditions": [
-    {"venue": "小倉", "surface": "芝", "distance": 1200, "condition": "full_gate", "note": "小倉1200フルゲートは荒れる"},
-    {"venue": "東京", "surface": "芝", "distance": 1400, "note": "府中の1400は荒れる"},
-    {"venue": "中山", "surface": "芝", "distance": 1600, "note": "中山マイルは荒れる"},
-    {"venue": "東京", "surface": "芝", "distance": 1600, "gate_inner": true, "note": "東京新聞杯：内枠が穴をあける"},
-    {"race_name": "ダイヤモンドS", "note": "ダイヤモンドSは荒れる"},
-    {"race_name": "根岸S", "note": "根岸は荒れる"},
-    {"race_name": "中山牝馬S", "note": "中山牝馬Sは荒れる"},
-    {"race_name": "フィリーズレビュー", "note": "フィリーズレビューは荒れる"},
-    {"race_name": "日経新春杯", "note": "日経新春杯は荒れる"},
-    {"race_name": "京成杯", "note": "京成杯は荒れる"},
-    {"race_name": "函館記念", "note": "函館記念は荒れる"},
-    {"race_name": "北九州記念", "note": "北九州記念は荒れる"},
-    {"race_name": "スプリンターズS", "note": "スプリンターズSは荒れる"},
-    {"race_name": "スワンS", "note": "スワンSは荒れる（2枠注目）"}
+    {
+      "venue": "小倉",
+      "surface": "芝",
+      "distance": 1200,
+      "condition": "full_gate",
+      "note": "小倉1200フルゲートは荒れる"
+    },
+    {
+      "venue": "東京",
+      "surface": "芝",
+      "distance": 1400,
+      "note": "府中の1400は荒れる"
+    },
+    {
+      "venue": "中山",
+      "surface": "芝",
+      "distance": 1600,
+      "note": "中山マイルは荒れる"
+    },
+    {
+      "venue": "東京",
+      "surface": "芝",
+      "distance": 1600,
+      "gate_inner": true,
+      "note": "東京新聞杯：内枠が穴をあける"
+    },
+    {
+      "race_name": "ダイヤモンドS",
+      "note": "ダイヤモンドSは荒れる"
+    },
+    {
+      "race_name": "根岸S",
+      "note": "根岸は荒れる"
+    },
+    {
+      "race_name": "中山牝馬S",
+      "note": "中山牝馬Sは荒れる"
+    },
+    {
+      "race_name": "フィリーズレビュー",
+      "note": "フィリーズレビューは荒れる"
+    },
+    {
+      "race_name": "日経新春杯",
+      "note": "日経新春杯は荒れる"
+    },
+    {
+      "race_name": "京成杯",
+      "note": "京成杯は荒れる"
+    },
+    {
+      "race_name": "函館記念",
+      "note": "函館記念は荒れる"
+    },
+    {
+      "race_name": "北九州記念",
+      "note": "北九州記念は荒れる"
+    },
+    {
+      "race_name": "スプリンターズS",
+      "note": "スプリンターズSは荒れる"
+    },
+    {
+      "race_name": "スワンS",
+      "note": "スワンSは荒れる（2枠注目）"
+    }
   ],
-
   "avoid_conditions": [
-    {"condition": "summer_local_final_week_turf_maiden", "note": "夏のローカル最終週芝短距離未勝利は買うな"},
-    {"sire": "ディープインパクト", "venue": "阪神", "action": "buy", "bonus": 0.015, "note": "阪神はディープの庭"}
+    {
+      "condition": "summer_local_final_week_turf_maiden",
+      "note": "夏のローカル最終週芝短距離未勝利は買うな"
+    },
+    {
+      "sire": "ディープインパクト",
+      "venue": "阪神",
+      "action": "buy",
+      "bonus": 0.015,
+      "note": "阪神はディープの庭"
+    }
   ],
-
   "short_term_foreign_jockeys": {
     "_comment": "短期免許外国人騎手リスト。重賞での成績が特に優秀。随時更新してください。",
     "notable": [
-      {"name": "C.ルメール",   "resident": true,  "note": "在留。実質日本騎手として扱う"},
-      {"name": "M.デムーロ",   "resident": true,  "note": "在留。実質日本騎手として扱う"},
-      {"name": "J.モレイラ",   "resident": false, "note": "短期。重賞での爆発力は別格"},
-      {"name": "W.ビュイック",  "resident": false, "note": "短期。欧州実績豊富、G1での安定感"},
-      {"name": "R.ムーア",     "resident": false, "note": "短期。海外G1実績No.1級"},
-      {"name": "F.デットーリ",  "resident": false, "note": "短期。日本への相性は抜群ではないが格は本物"},
-      {"name": "H.ドイル",     "resident": false, "note": "短期。近年増加傾向、重賞勝率高い"},
-      {"name": "Z.パートン",   "resident": false, "note": "短期。関西圏重賞でパフォーマンス上がる"},
-      {"name": "O.マーフィー",  "resident": false, "note": "短期。若手トップ、狙い目多い"}
+      {
+        "name": "C.ルメール",
+        "resident": true,
+        "note": "在留。実質日本騎手として扱う"
+      },
+      {
+        "name": "M.デムーロ",
+        "resident": true,
+        "note": "在留。実質日本騎手として扱う"
+      },
+      {
+        "name": "J.モレイラ",
+        "resident": false,
+        "note": "短期。重賞での爆発力は別格"
+      },
+      {
+        "name": "W.ビュイック",
+        "resident": false,
+        "note": "短期。欧州実績豊富、G1での安定感"
+      },
+      {
+        "name": "R.ムーア",
+        "resident": false,
+        "note": "短期。海外G1実績No.1級"
+      },
+      {
+        "name": "F.デットーリ",
+        "resident": false,
+        "note": "短期。日本への相性は抜群ではないが格は本物"
+      },
+      {
+        "name": "H.ドイル",
+        "resident": false,
+        "note": "短期。近年増加傾向、重賞勝率高い"
+      },
+      {
+        "name": "Z.パートン",
+        "resident": false,
+        "note": "短期。関西圏重賞でパフォーマンス上がる"
+      },
+      {
+        "name": "O.マーフィー",
+        "resident": false,
+        "note": "短期。若手トップ、狙い目多い"
+      }
     ],
     "graded_race_bonus": 0.03,
     "note": "短期外国人騎手が重賞に乗る場合、市場が過小評価しがちでオッズに割安感が出やすい。特に初騎乗の馬でも馬の能力を引き出すことが多い。"
   },
-
   "race_proverbs": [
     {
       "race_name": "VM",
-      "alias": ["ヴィクトリアマイル", "Victoria Mile"],
+      "alias": [
+        "ヴィクトリアマイル",
+        "Victoria Mile"
+      ],
       "proverb": "1400mで強い競馬をした馬が勝つ",
       "source": "ハロン棒ch",
       "checklist": [
@@ -404,7 +1145,10 @@
       "race_name": "安田記念",
       "proverb": "前走マイルCS・香港マイル組が強い",
       "source": "一般格言",
-      "checklist": ["前走マイルCSまたは香港マイル組", "距離実績1600m"],
+      "checklist": [
+        "前走マイルCSまたは香港マイル組",
+        "距離実績1600m"
+      ],
       "action": "buy_pattern",
       "note": "最高峰のマイル実績がある馬を優先。"
     },
@@ -412,9 +1156,40 @@
       "race_name": "宝塚記念",
       "proverb": "大阪杯組が強い・内枠有利",
       "source": "一般格言",
-      "checklist": ["前走大阪杯組", "内枠（1〜4枠）", "阪神2200m実績"],
+      "checklist": [
+        "前走大阪杯組",
+        "内枠（1〜4枠）",
+        "阪神2200m実績"
+      ],
       "action": "buy_pattern",
       "note": "内回りで先行できる馬が有利。外枠の差し馬は届きにくい。"
     }
-  ]
+  ],
+  "local_jockeys": {
+    "_comment": "地方所属ジョッキーがJRA(中央)に騎乗する時は陣営の勝負気配。出馬表分析はJRA限定なので、これらの名前が出れば即「中央騎乗サイン」。",
+    "notable": [
+      {
+        "name": "石川倭",
+        "base": "門別(ホッカイドウ)",
+        "note": "門別出身トップ級。中央でも仕事をする信頼ジョッキー"
+      },
+      {
+        "name": "矢野貴之",
+        "base": "大井(南関)",
+        "note": "南関リーディング級。中央でも信頼度高い"
+      },
+      {
+        "name": "落合玄太",
+        "base": "門別(ホッカイドウ)",
+        "note": "門別。中央遠征歴あり（昨年も来ていた）"
+      },
+      {
+        "name": "御神本訓史",
+        "base": "大井(南関)",
+        "note": "南関リーディング級。中央騎乗は勝負気配"
+      }
+    ],
+    "central_ride_bonus": 0.025,
+    "note": "ユーザー重視ジンクス: 地方トップ騎手の中央出走自体が珍しく、必ず何か仕事をする。評価を上げる。"
+  }
 }

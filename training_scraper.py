@@ -17,10 +17,46 @@ URL形式: https://race.netkeiba.com/race/shutuba_past.html?race_id=XXXX
 """
 import time
 import re
+import json
 import requests
 from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
+from pathlib import Path
 import pandas as pd
 import streamlit as st
+
+# ============================================================
+# TRAIN-4: ファイルキャッシュ（セッション間で永続化、3日間有効）
+# ============================================================
+_CACHE_DIR = Path(__file__).parent / "data" / "training_cache"
+_CACHE_TTL_DAYS = 3
+
+
+def _load_training_cache(race_id: str) -> dict | None:
+    """ファイルキャッシュから調教データを読み込む（3日以内のみ有効）"""
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_file = _CACHE_DIR / f"{race_id}.json"
+    if not cache_file.exists():
+        return None
+    mtime = datetime.fromtimestamp(cache_file.stat().st_mtime)
+    if datetime.now() - mtime > timedelta(days=_CACHE_TTL_DAYS):
+        return None  # 期限切れ
+    try:
+        with open(cache_file, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _save_training_cache(race_id: str, data: dict) -> None:
+    """調教データをファイルキャッシュに保存"""
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_file = _CACHE_DIR / f"{race_id}.json"
+    try:
+        with open(cache_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
 HEADERS = {
     'User-Agent': (
@@ -45,6 +81,7 @@ def _get(url: str) -> BeautifulSoup | None:
 def get_horse_ids_from_race(race_id: str) -> dict[str, str]:
     """
     出馬表ページから「馬名 → horse_id」の対応表を取得する。
+    複数セレクタをフォールバックで試行する。
     """
     url = f'https://race.netkeiba.com/race/shutuba.html?race_id={race_id}'
     soup = _get(url)
@@ -52,17 +89,31 @@ def get_horse_ids_from_race(race_id: str) -> dict[str, str]:
         return {}
 
     id_map = {}
-    for a in soup.select('a[href*="/horse/"]'):
-        href = a.get('href', '')
-        m = re.search(r'/horse/(\d+)', href)
-        if m:
-            name = a.get_text(strip=True)
-            if name:
-                id_map[name] = m.group(1)
+    # 複数セレクタを順番に試行（netkeibaのHTML構造変更に対応）
+    selectors = [
+        'a[href*="/horse/"]',
+        '.HorseName a',
+        'td.HorseName a',
+        '.Shutuba_Table .HorseName a',
+        'td.Horse_Name a',
+        '.horse_name a',
+        'td[class*="Horse"] a',
+    ]
+    for selector in selectors:
+        for a in soup.select(selector):
+            href = a.get('href', '')
+            m = re.search(r'/horse/(\d+)', href)
+            if m:
+                name = a.get_text(strip=True)
+                if name and len(name) > 1:
+                    id_map[name] = m.group(1)
+        if id_map:
+            break  # マッチしたセレクタで十分
     return id_map
 
 
-@st.cache_data(ttl=1800)
+# BUG-X5: TTL 統一 → レース固有 900秒
+@st.cache_data(ttl=900)
 def fetch_training_times(horse_id: str) -> list[dict]:
     """
     馬IDから調教タイムを取得する。
@@ -417,11 +468,15 @@ def fetch_all_training_with_partner(
     -------
     dict[horse_name, {score, bonus, label, message, partner_name, partner_won_sat, ...}]
     """
-    from datetime import date, timedelta
+    from datetime import date as _date
+
+    # TRAIN-4: まずファイルキャッシュを確認
+    cached = _load_training_cache(race_id)
+    if cached is not None:
+        return cached
 
     if not saturday_date_str:
-        # 自動で前日（土曜）を計算
-        today = date.today()
+        today = _date.today()
         sat = today - timedelta(days=(today.weekday() - 5) % 7 or 7)
         saturday_date_str = sat.strftime("%Y%m%d")
 
@@ -462,4 +517,6 @@ def fetch_all_training_with_partner(
             'partner_message': partner_eval['message'],
         }
 
+    # TRAIN-4: ファイルキャッシュに保存
+    _save_training_cache(race_id, result)
     return result

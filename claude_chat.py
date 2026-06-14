@@ -156,7 +156,7 @@ def stream_chat_response(
 
     def _generator():
         with client.messages.stream(
-            model="claude-opus-4-5",
+            model="claude-opus-4-6",
             max_tokens=1200,
             system=system_prompt,
             messages=api_messages,
@@ -188,7 +188,7 @@ def render_chat_tab(
     Streamlit のチャットタブをレンダリングする。
     app.py から呼び出す。
     """
-    st.subheader("🤖 予想ブレインに相談")
+    st.subheader("予想ブレインに相談")
     st.caption("レース分析データを踏まえてAIが一緒に考えます")
 
     # システムプロンプト構築
@@ -224,18 +224,18 @@ def render_chat_tab(
 
     scene = st.radio(
         "シーンを選ぶ",
-        ["🎯 人気馬の相手選び", "💰 買い目の最終確認", "📊 レース後の振り返り"],
+        ["人気馬の相手選び", "買い目の最終確認", "レース後の振り返り"],
         horizontal=True,
         key="chat_scene",
     )
 
-    if scene == "🎯 人気馬の相手選び":
+    if scene == "人気馬の相手選び":
         quick_questions = [
             "穴馬の軸は決まった。人気馬の相手として誰がいい？",
             "1〜3番人気の中で今回の展開に最も合うのは？",
             "人気馬をあえて嫌う理由はある？",
         ]
-    elif scene == "💰 買い目の最終確認":
+    elif scene == "買い目の最終確認":
         quick_questions = [
             "今の推奨買い目で問題ない？ブレイン視点で意見を聞かせて",
             "予算5000円でこの馬券構成はどう思う？",
@@ -264,7 +264,7 @@ def render_chat_tab(
         stream_chat_response(st.session_state["chat_messages"], system_prompt)
 
     # 会話リセット
-    if st.button("🔄 会話をリセット", key="chat_reset"):
+    if st.button("会話をリセット", key="chat_reset"):
         st.session_state["chat_messages"] = [
             {"role": "assistant", "content": INTRO_MESSAGE}
         ]

@@ -118,8 +118,14 @@ def _sex_match(cond: dict, sex: str) -> bool:
 def _cond_match_all(cond: dict, venue: str, surface: str, distance: int,
                     gate: int, popularity: int, running_style: str,
                     race_class: str, month: int, sex: str,
-                    track_condition: str, distance_change: str) -> bool:
+                    track_condition: str, distance_change: str,
+                    race_name: str = "") -> bool:
     """全条件のAND判定。"""
+    # 第28波修正: race_name_contains が未照合で「特定レース限定」の格言が
+    # 全レースで誤発動していた（例: チューリップ賞限定の武豊+0.03 が常時加点）
+    if "race_name_contains" in cond:
+        if not race_name or cond["race_name_contains"] not in str(race_name):
+            return False
     if not _venue_match(cond, venue): return False
     if not _surface_match(cond, surface): return False
     if not _distance_match(cond, distance): return False
@@ -158,6 +164,7 @@ def get_jockey_bonus(
     distance_change: str = "",
     prev_jockey: str = "",
     trainer: str = "",
+    race_name: str = "",
 ) -> dict:
     """
     騎手パターン・乗り替わりパターン・調教師×騎手コンボを照合し、
@@ -183,7 +190,8 @@ def get_jockey_bonus(
         for cond in p.get("conditions", [{}]):
             if _cond_match_all(cond, venue, surface, distance, gate,
                                 popularity, running_style, race_class,
-                                month, sex, track_condition, distance_change):
+                                month, sex, track_condition, distance_change,
+                                race_name=race_name):
                 b = p.get("bonus", 0.0)
                 total_bonus += b
                 if p.get("action") == "avoid":
@@ -222,7 +230,8 @@ def get_jockey_bonus(
         for cond in conds:
             if _cond_match_all(cond, venue, surface, distance, gate,
                                 popularity, running_style, race_class,
-                                month, sex, track_condition, distance_change):
+                                month, sex, track_condition, distance_change,
+                                race_name=race_name):
                 matched = True
                 break
         if matched:
@@ -404,7 +413,7 @@ def get_claude_context_for_race(
         jr = get_jockey_bonus(jockey, venue, surface, distance, gate,
                                popularity, running_style, race_class,
                                month, sex, track_condition, distance_change,
-                               prev_jockey, trainer)
+                               prev_jockey, trainer, race_name=race_name)
         for n in jr["notes"]:
             lines.append(f"[KB騎手メモ] {horse_name}（{jockey}）: {n}")
         for a in jr["avoids"]:
@@ -489,7 +498,7 @@ def apply_kb_to_horse(horse: dict, race_name: str = "") -> dict:
         jr = get_jockey_bonus(jockey, venue, surface, distance, gate,
                                popularity, running_style, race_class,
                                month, sex, track_condition, distance_change,
-                               prev_jockey, trainer)
+                               prev_jockey, trainer, race_name=race_name)
         total_bonus += jr["bonus"]
         all_notes.extend(jr["notes"])
         all_avoids.extend(jr["avoids"])
@@ -502,6 +511,13 @@ def apply_kb_to_horse(horse: dict, race_name: str = "") -> dict:
         if sr["note"]:
             all_notes.append(sr["note"])
 
+    # 地方ジョッキー中央騎乗（ユーザー重視ジンクス）
+    if jockey:
+        lj = get_local_jockey_bonus(jockey)
+        if lj["is_local"]:
+            total_bonus += lj["bonus"]
+            all_notes.append(lj["note"])
+
     # 特殊シグナル
     sig = get_special_signal_bonus(
         is_g1_blinker_first=h.get("blinker_first", False),
@@ -513,10 +529,34 @@ def apply_kb_to_horse(horse: dict, race_name: str = "") -> dict:
     total_bonus += sig["bonus"]
     all_notes.extend(sig["notes"])
 
-    h["kb_bonus"] = round(total_bonus, 4)
+    # 第28波: 合算キャップ（複数格言の積み上げで勝率補正が暴れるのを防止）
+    h["kb_bonus"] = float(max(-0.06, min(0.06, round(total_bonus, 4))))
     h["kb_notes"] = all_notes
     h["kb_avoids"] = all_avoids
     return h
+
+
+# ---- 地方ジョッキー中央騎乗チェック ---- #
+
+def get_local_jockey_bonus(jockey: str) -> dict:
+    """地方所属トップ騎手がJRA(中央)に騎乗する場合のボーナス。
+
+    出馬表分析CSVはJRA限定なので、登録名にマッチ=中央騎乗のサイン。
+    Returns: {"bonus": float, "is_local": bool, "note": str}
+    """
+    if not jockey:
+        return {"bonus": 0.0, "is_local": False, "note": ""}
+    kb = load_kb()
+    lj = kb.get("local_jockeys", {})
+    notable = lj.get("notable", [])
+    bonus = lj.get("central_ride_bonus", 0.025)
+    jk = str(jockey).strip()
+    matched = next((j for j in notable
+                    if j.get("name", "") and (j["name"] in jk or jk in j["name"])), None)
+    if matched:
+        return {"bonus": bonus, "is_local": True,
+                "note": f"地方{matched['base']}所属 {jk} の中央騎乗（勝負気配）"}
+    return {"bonus": 0.0, "is_local": False, "note": ""}
 
 
 # ---- 短期外国人騎手チェック ---- #

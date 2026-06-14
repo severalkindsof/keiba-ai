@@ -43,12 +43,12 @@ NEGATIVE_KEYWORDS = [
     "不安", "心配", "難しい", "今ひとつ",
 ]
 
-# 追い切り強度スコア
+# 追い切り強度スコア（UI-5-A: ボーナス拡大・馬なりにも微加点）
 WORK_INTENSITY = {
-    "一杯":   0.15,
-    "強め":   0.10,
-    "馬なり": 0.0,
-    "軽め":   -0.05,
+    "一杯":   0.20,   # 0.15→0.20
+    "強め":   0.12,   # 0.10→0.12
+    "馬なり": 0.03,   # 0.00→0.03
+    "軽め":   -0.02,  # -0.05→-0.02
 }
 
 # コースボーナス
@@ -95,13 +95,27 @@ def fetch_race_training(race_id: str) -> dict:
         "race_id":    race_id,
         "fetched_at": datetime.now().isoformat(),
         "horses":     {},
+        "_debug":     {},
     }
 
-    # ① 調教タイムページ
-    url = f"https://race.netkeiba.com/race/oikiri.html?race_id={race_id}"
-    soup = _get(url)
-    if soup:
-        _parse_oikiri_page(soup, result)
+    # ① 調教タイムページ（PC版 → SP版の順でフォールバック）
+    for _url_try in [
+        f"https://race.netkeiba.com/race/oikiri.html?race_id={race_id}",
+        f"https://sp.netkeiba.com/race/oikiri.html?race_id={race_id}",
+    ]:
+        soup = _get(_url_try)
+        if soup:
+            _html_len = len(str(soup))
+            _html_preview = str(soup)[:300].replace("\n", " ")
+            result["_debug"][_url_try] = f"HTML {_html_len}文字 | {_html_preview}"
+            _parse_oikiri_page(soup, result)
+            if result["horses"]:
+                print(f"[training] {_url_try} → {len(result['horses'])}頭取得")
+                break
+            else:
+                print(f"[training] {_url_try} → 0頭（セレクタ不一致）")
+        else:
+            result["_debug"][_url_try] = "取得失敗（接続エラーまたはタイムアウト）"
 
     # ② 馬別調教ページ（horse_id が必要なので shutuba から取得）
     _enrich_from_shutuba(race_id, result)
@@ -116,8 +130,25 @@ def fetch_race_training(race_id: str) -> dict:
 
 def _parse_oikiri_page(soup: BeautifulSoup, result: dict):
     """調教ページから追い切り時計・コース・強度を取得"""
-    # 馬名と調教データを探す
-    for row in soup.select("tr.OikiriTr, tr[class*='Horse']"):
+    # B-6: 複数セレクタを試行（netkeibaのHTML構造変更に対応）
+    _selectors = [
+        "tr.OikiriTr",
+        "tr[class*='Horse']",
+        ".Oikiri_Table tr",
+        ".training_table tr",
+        "table.nk_tb_common tr",
+        "table tr",  # 最後の手段
+    ]
+    rows = []
+    for _sel in _selectors:
+        rows = soup.select(_sel)
+        if len(rows) >= 2:  # ヘッダ行除いて1行以上
+            print(f"[training] セレクタ '{_sel}': {len(rows)}行")
+            break
+    if not rows:
+        print("[training] 全セレクタで0行 → HTML構造を確認してください")
+        return
+    for row in rows:
         try:
             name_el = row.select_one(".HorseName, td.horsename, .HorseNameSmall")
             if not name_el:
@@ -248,7 +279,7 @@ def evaluate_training(horse_name: str, training_data: dict) -> dict:
         score += c_bonus
 
         if time_str:
-            detail_parts.append(f"⏱{time_str}秒")
+            detail_parts.append(f"{time_str}秒")
 
     # コメント評価
     all_comments = " ".join(comments)
@@ -263,9 +294,10 @@ def evaluate_training(horse_name: str, training_data: dict) -> dict:
         detail_parts.append(f"コメント△")
 
     # ラベル
-    if score >= 0.20:
+    # UI-5-A: 閾値を下げてスコア帯を広げる
+    if score >= 0.15:
         label = "調教◎（状態良好）"
-    elif score >= 0.10:
+    elif score >= 0.07:
         label = "調教○（普通以上）"
     elif score >= 0.0:
         label = "調教△（普通）"

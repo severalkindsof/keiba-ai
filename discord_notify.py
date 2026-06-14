@@ -87,7 +87,7 @@ def notify_odds_alert(signals: list[dict], race_name: str = "") -> bool:
             "footer": {"text": "競馬AI オッズモニター"},
         })
 
-    content = f"🚨 **{race_name}** でオッズ急変を検出しました！"
+    content = f"**{race_name}** でオッズ急変を検出しました！"
     return send_discord(content=content, embeds=embeds)
 
 
@@ -115,7 +115,7 @@ def notify_analysis_complete(
         )
 
     embed = {
-        "title": f"📋 分析完了: {race_name}",
+        "title": f"分析完了: {race_name}",
         "description": "\n".join(lines),
         "color": 0x00C851,  # 緑
         "fields": [
@@ -127,7 +127,7 @@ def notify_analysis_complete(
     }
 
     return send_discord(
-        content=f"🐎 **{race_name}** の分析が完了しました。推奨馬 {len(buy_horses)}頭あり！",
+        content=f"**{race_name}** の分析が完了しました。推奨馬 {len(buy_horses)}頭あり！",
         embeds=[embed],
     )
 
@@ -150,7 +150,7 @@ def notify_bet_plan(
         lines.append(f"**{t['bet_type']}** {horses_str} {t['amount']:,}円 {ev_str}")
 
     embed = {
-        "title": f"🎫 買い目プラン: {race_name}",
+        "title": f"買い目プラン: {race_name}",
         "description": "\n".join(lines),
         "color": 0xFFAA00,  # オレンジ
         "fields": [
@@ -160,7 +160,7 @@ def notify_bet_plan(
     }
 
     return send_discord(
-        content=f"💰 **{race_name}** の買い目を確定しました",
+        content=f"**{race_name}** の買い目を確定しました",
         embeds=[embed],
     )
 
@@ -176,7 +176,7 @@ def notify_weekly_report(
     """
     import pandas as pd
 
-    roi_emoji = "✅" if overall_roi >= 100 else "❌"
+    roi_emoji = "" if overall_roi >= 100 else ""
     roi_color = 0x00C851 if overall_roi >= 100 else 0xFF4444
 
     # 最近4週の行を文字列化
@@ -184,7 +184,7 @@ def notify_weekly_report(
     if not weekly_df.empty:
         for _, row in weekly_df.tail(4).iterrows():
             roi_val = row.get("roi", 0)
-            mark = "✅" if roi_val >= 100 else "❌"
+            mark = "" if roi_val >= 100 else ""
             lines.append(
                 f"{mark} **{row['week']}** — 投資{int(row['invested']):,}円 / 回収{int(row['returned']):,}円 / 回収率{roi_val:.0f}%"
             )
@@ -202,7 +202,7 @@ def notify_weekly_report(
     }
 
     return send_discord(
-        content=f"📊 週次レポート（通算回収率 **{overall_roi:.1f}%**）",
+        content=f"週次レポート（通算回収率 **{overall_roi:.1f}%**）",
         embeds=[embed],
     )
 
@@ -218,14 +218,14 @@ def notify_post_race_analysis(
     short_text = analysis_text[:500] + "…（続きはアプリで確認）" if len(analysis_text) > 500 else analysis_text
 
     embed = {
-        "title": f"🤖 振り返り分析: {race_name}",
+        "title": f"振り返り分析: {race_name}",
         "description": short_text,
         "color": 0x9C27B0,  # 紫
         "footer": {"text": datetime.now().strftime("%m/%d %H:%M")},
     }
 
     return send_discord(
-        content=f"📝 **{race_name}** の振り返り分析が完了しました",
+        content=f"**{race_name}** の振り返り分析が完了しました",
         embeds=[embed],
     )
 
@@ -238,16 +238,16 @@ def render_discord_setup_section() -> None:
     """
     サイドバーまたは設定画面で Discord Webhook を設定・テストするUI。
     """
-    st.markdown("### 🔔 Discord通知設定")
+    st.markdown("### Discord通知設定")
     webhook_url = _get_webhook_url()
 
     if webhook_url:
-        st.success("✅ Discord Webhook が設定されています")
-        if st.button("📡 テスト通知を送信", key="discord_test"):
+        st.success("Discord Webhook が設定されています")
+        if st.button("テスト通知を送信", key="discord_test"):
             ok = send_discord(
-                content="🐎 競馬AI からテスト通知です！設定が正常に完了しています。",
+                content="競馬AI からテスト通知です！設定が正常に完了しています。",
                 embeds=[{
-                    "title": "✅ 通知テスト成功",
+                    "title": "通知テスト成功",
                     "description": "このメッセージが届いていれば、オッズ急落アラートや週次レポートが届くようになります。",
                     "color": 0x00C851,
                     "footer": {"text": datetime.now().strftime("%Y/%m/%d %H:%M")},
@@ -259,7 +259,7 @@ def render_discord_setup_section() -> None:
                 st.error("送信失敗。Webhook URLを確認してください")
     else:
         st.warning("Discord Webhook URLが未設定です")
-        with st.expander("⚙️ 設定手順を見る"):
+        with st.expander("設定手順を見る"):
             st.markdown("""
 **手順（3分で完了）:**
 

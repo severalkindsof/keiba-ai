@@ -6,8 +6,7 @@
 2. 動的計算：Kaggleの過去データから枠番別の勝率を実際に算出して補正
 """
 import pandas as pd
-import numpy as np
-import streamlit as st
+import streamlit as st  # CLEAN: numpy 未使用のため削除
 
 
 # ---- 静的バイアステーブル（調査ベース） ---- #

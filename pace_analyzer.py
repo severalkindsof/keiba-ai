@@ -31,7 +31,9 @@ def infer_running_style(history: pd.DataFrame) -> str:
             continue
         try:
             if col == "corner4":
-                positions = pd.to_numeric(history[col], errors="coerce").dropna().head(5).tolist()
+                # TFJV "5=3" 形式に対応: str.extract で先頭数字のみ取得（train_lgbm.pyと統一）
+                _parsed = history[col].astype(str).str.extract(r"^(\d+)", expand=False)
+                positions = pd.to_numeric(_parsed, errors="coerce").dropna().head(5).tolist()
             else:
                 positions = []
                 for val in history[col].dropna().head(5):
@@ -40,29 +42,35 @@ def infer_running_style(history: pd.DataFrame) -> str:
                         positions.append(int(first))
             if not positions:
                 continue
+            # B-2: 2件以上のデータがある場合のみ判定（1件では誤判定が多い）
+            if len(positions) < 2:
+                continue
             # 直近2走を重視した加重平均
             weights = [2 if i < 2 else 1 for i in range(len(positions))]
             avg = np.average(positions[:len(weights)], weights=weights[:len(positions)])
             field_series = pd.to_numeric(history.get("field_size", pd.Series([16]*len(history))), errors="coerce")
             field = field_series.mean() if pd.notna(field_series.mean()) and field_series.mean() > 0 else 16
             ratio = avg / field
-            if ratio <= 0.12:
+            # LATENT-6: 閾値を実態に合わせて修正（逃げ=ほぼ最前列）
+            if ratio <= 0.08:
                 return "逃げ"
-            elif ratio <= 0.30:
+            elif ratio <= 0.28:
                 return "先行"
-            elif ratio <= 0.55:
+            elif ratio <= 0.60:
                 return "中団"
             else:
                 return "差し・追込"
         except Exception:
             continue
     # コーナーなければ上がり3Fで推定
+    # B-2: TFJVのlast_3fは0.1秒単位（347 = 34.7秒）→ 自動判定して秒に変換
     if "last_3f" in history.columns:
         avg3f = pd.to_numeric(history["last_3f"], errors="coerce").mean()
         if pd.notna(avg3f):
-            if avg3f <= 34.0:
+            avg3f_sec = avg3f / 10 if avg3f > 100 else avg3f  # 100以上なら0.1秒単位
+            if avg3f_sec <= 34.0:
                 return "差し・追込"
-            elif avg3f <= 35.5:
+            elif avg3f_sec <= 35.5:
                 return "中団"
             else:
                 return "先行"
@@ -77,8 +85,9 @@ def predict_pace(horses: list[dict]) -> dict:
 
     horses: 各dictに 'running_style'（逃げ/先行/中団/差し・追込/不明）が入っている想定。
     """
-    front_runners = sum(1 for h in horses if h.get("running_style", "") in ("逃げ",))
-    leaders = sum(1 for h in horses if h.get("running_style", "") in ("逃げ", "先行"))
+    front_runners  = sum(1 for h in horses if h.get("running_style", "") == "逃げ")
+    leaders_only   = sum(1 for h in horses if h.get("running_style", "") == "先行")
+    leaders        = front_runners + leaders_only   # 逃げ+先行（ペース判定用）
 
     if front_runners >= 3:
         pace = "ハイペース"
@@ -102,8 +111,8 @@ def predict_pace(horses: list[dict]) -> dict:
         "predicted_pace": pace,
         "pace_score": pace_score,  # 0=スロー, 1=ミドル, 2=ミドルハイ, 3=ハイ
         "front_runner_count": front_runners,
-        "leader_count": leaders,
-        "summary": f"逃げ{front_runners}頭 先行{leaders}頭 → {pace}予想",
+        "leader_count": leaders_only,
+        "summary": f"逃げ{front_runners}頭 先行{leaders_only}頭 → {pace}予想",
     }
 
 

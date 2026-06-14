@@ -109,11 +109,13 @@ def eval_favorite_reliability(
     n_horses: int,
     popularity: int,
     running_style: str = '不明',
+    fav_odds: float = 0.0,
+    second_odds: float = 0.0,
 ) -> dict:
     """
     1番人気馬の信頼度を評価する。
 
-    穴狙いのユーザーにとっては「本命が脆弱なレース」を選ぶための指標。
+    A-3: 実際のオッズを使って荒れスコアを計算（ハードコード値から脱却）
 
     Returns:
         favorite_win_rate: float（本命の推定勝率）
@@ -122,39 +124,56 @@ def eval_favorite_reliability(
         upset_score: int（0〜100, 高いほど穴馬チャンス大）
         message: str
     """
-    base_wr = FAVORITE_WIN_RATES.get(min(18, max(5, n_horses)), 0.35)
-    style_info = STYLE_RELIABILITY.get(running_style, STYLE_RELIABILITY['不明'])
+    # A-3: 実際のオッズが渡された場合は優先して使う
+    if fav_odds >= 1.1:
+        # 1番人気オッズ → 荒れやすさベーススコア
+        if   fav_odds <= 2.0:  base_score = 10
+        elif fav_odds <= 3.0:  base_score = 20
+        elif fav_odds <= 4.0:  base_score = 35
+        elif fav_odds <= 6.0:  base_score = 50
+        elif fav_odds <= 10.0: base_score = 65
+        else:                  base_score = 80
 
-    if popularity == 1:
-        # 1番人気の場合、脚質補正を適用
-        adj_wr = (base_wr + style_info['win_rate']) / 2
-        reliability = style_info['label']
+        # 人気分散（1番/2番の比）
+        if second_odds > 0:
+            ratio = second_odds / fav_odds
+            spread = 0 if ratio <= 1.5 else 10 if ratio <= 2.0 else 20 if ratio <= 3.0 else 30
+        else:
+            spread = 15  # デフォルト
+
+        # 頭数補正
+        field_bonus = min((n_horses - 8) * 2, 20) if n_horses > 8 else 0
+
+        upset_score = min(100, base_score + spread + field_bonus)
+        adj_wr      = round(1.0 / fav_odds, 3) if fav_odds > 1 else 0.35
+        is_weak     = upset_score >= 50
+        reliability = "オッズ計算"
     else:
-        adj_wr = base_wr
-        reliability = '参考値'
-
-    # 荒れやすさスコア（本命の弱さ + 頭数の多さ）
-    upset_score = int(
-        (1 - adj_wr) * 60          # 本命勝率が低いほど荒れやすい
-        + min(n_horses, 18) * 2.2   # 頭数多いほど荒れやすい
-    )
-    upset_score = min(100, max(0, upset_score))
-
-    is_weak = (n_horses >= 14 and adj_wr < 0.35) or running_style == '差し・追込'
+        # オッズ未取得時のフォールバック（従来計算）
+        base_wr    = FAVORITE_WIN_RATES.get(min(18, max(5, n_horses)), 0.35)
+        style_info = STYLE_RELIABILITY.get(running_style, STYLE_RELIABILITY['不明'])
+        if popularity == 1:
+            adj_wr      = (base_wr + style_info['win_rate']) / 2
+            reliability = style_info['label']
+        else:
+            adj_wr      = base_wr
+            reliability = '参考値'
+        upset_score = min(100, max(0, int((1 - adj_wr) * 55 + min(n_horses, 18) * 1.5)))
+        is_weak     = (n_horses >= 14 and adj_wr < 0.35) or running_style == '差し・追込'
 
     if is_weak:
-        msg = f'頭数{n_horses}頭、{running_style}の本命→ 荒れやすいレース（穴狙いチャンス）'
-    elif adj_wr >= 0.50:
-        msg = f'頭数{n_horses}頭、{running_style}→ 本命鉄板の可能性（穴は薄い）'
+        msg = f'1番人気オッズ{fav_odds:.1f}倍、{n_horses}頭→ 荒れやすいレース（穴狙いチャンス）' if fav_odds >= 1.1 else f'頭数{n_horses}頭→ 荒れやすい'
+    elif upset_score <= 25:
+        msg = f'1番人気オッズ{fav_odds:.1f}倍→ 本命有力（穴は薄め）' if fav_odds >= 1.1 else f'頭数{n_horses}頭→ 本命鉄板'
     else:
-        msg = f'頭数{n_horses}頭→ 標準的な荒れやすさ'
+        msg = f'1番人気オッズ{fav_odds:.1f}倍、{n_horses}頭→ 標準的な荒れやすさ' if fav_odds >= 1.1 else f'頭数{n_horses}頭→ 標準'
 
     return {
         'favorite_win_rate': round(adj_wr, 3),
         'reliability_label': reliability,
-        'is_weak_favorite': is_weak,
-        'upset_score': upset_score,
-        'message': msg,
+        'is_weak_favorite':  is_weak,
+        'upset_score':       upset_score,
+        'message':           msg,
     }
 
 

@@ -72,12 +72,15 @@ def analyze_rotation(
     prev_race_date: str | None,
     current_race_date: str | None,
     running_style: str = "不明",
+    history: pd.DataFrame | None = None,
 ) -> dict:
     """
     前走からの間隔を評価する。
 
-    理想: 3〜5週間（21〜35日）
-    叩き台パターン: 2〜3週 + 前走凡走 → 仕上がり狙い目
+    UI-3: 「叩き」の正しい定義を反映
+    - 叩き1走目 = 3ヶ月（90日）以上の長期休養後の初戦
+    - 叩き2走目 = 叩き1走目の次走（前走と前々走の間隔が90日以上だった場合）
+    - それ以外の短い間隔は「標準ローテ」「やや間隔空き」として扱う
     """
     if prev_race_date is None or current_race_date is None:
         return {"signal": "不明", "bonus": 0.0, "days": None, "message": "日付情報なし"}
@@ -89,8 +92,21 @@ def analyze_rotation(
     except Exception:
         return {"signal": "不明", "bonus": 0.0, "days": None, "message": "日付解析エラー"}
 
+    # 前走が「叩き1走目」だったか（=前々走から前走までの間隔が90日以上）
+    is_tataki2 = False
+    if history is not None and not history.empty and "date" in history.columns:
+        try:
+            sorted_hist = history.sort_values("date", ascending=False).reset_index(drop=True)
+            if len(sorted_hist) >= 2:
+                prev_prev_date = pd.to_datetime(sorted_hist.iloc[1]["date"])
+                prev_date_dt   = pd.to_datetime(sorted_hist.iloc[0]["date"])
+                prev_gap = (prev_date_dt - prev_prev_date).days
+                if prev_gap >= 90:
+                    is_tataki2 = True
+        except Exception:
+            pass
+
     if days <= 7:
-        # 連闘（1週以内）
         bonus = -0.015 if running_style in ("差し・追込", "中団") else -0.005
         return {
             "signal": "連闘",
@@ -106,35 +122,46 @@ def analyze_rotation(
             "message": f"中1週（{days}日）：疲労残りに注意",
         }
     elif days <= 35:
-        # 理想的なローテーション
-        bonus = 0.01 if 21 <= days <= 35 else 0.005
-        label = "叩き2走目" if days <= 28 else "標準間隔"
+        if is_tataki2:
+            return {
+                "signal": "叩き2走目",
+                "bonus": +0.015,
+                "days": days,
+                "message": f"叩き2走目（{days}日）：長期休養明けの2戦目、本番仕上がり",
+            }
         return {
-            "signal": label,
-            "bonus": bonus,
+            "signal": "標準ローテ",
+            "bonus": 0.01,
             "days": days,
-            "message": f"{label}（{days}日）：理想的なローテーション",
+            "message": f"標準ローテ（{days}日）：理想的なレース間隔",
         }
     elif days <= 56:
+        if is_tataki2:
+            return {
+                "signal": "叩き2走目",
+                "bonus": +0.01,
+                "days": days,
+                "message": f"叩き2走目（{days}日）：長期休養明け2戦目（やや間隔空き）",
+            }
         return {
             "signal": "やや間隔空き",
             "bonus": -0.01,
             "days": days,
             "message": f"やや間隔空き（{days}日）：状態確認推奨",
         }
-    elif days <= 90:
+    elif days < 90:
         return {
-            "signal": "休養明け（叩き1走目）",
-            "bonus": -0.03,
+            "signal": "やや間隔空き（長め）",
+            "bonus": -0.02,
             "days": days,
-            "message": f"⛔ 休養明け（{days}日ぶり）：叩き1走目、調教内容を要確認",
+            "message": f"間隔長め（{days}日ぶり）：状態確認必要",
         }
     else:
         return {
-            "signal": "長期休養明け",
-            "bonus": -0.05,
+            "signal": "叩き1走目",
+            "bonus": -0.03,
             "days": days,
-            "message": f"⛔ 長期休養明け（{days}日ぶり）：本番仕上がり未知数",
+            "message": f"叩き1走目（{days}日ぶり）：長期休養明け初戦、調教内容を要確認",
         }
 
 
@@ -325,9 +352,10 @@ def analyze_rotation_for_field(
         h2["weight_bonus"] = weight_result["bonus"]
         h2["weight_message"] = weight_result["message"]
 
-        # ローテーション
+        # ローテーション（UI-3: history を渡して「叩き2走目」を正確に判定）
         prev_date = str(hist.iloc[0].get("date", "")) if not hist.empty and "date" in hist.columns else None
-        rot_result = analyze_rotation(prev_date, current_race_date, h2.get("running_style", "不明"))
+        rot_result = analyze_rotation(prev_date, current_race_date, h2.get("running_style", "不明"),
+                                      history=hist)
         h2["rotation_signal"] = rot_result["signal"]
         h2["rotation_bonus"] = rot_result["bonus"]
         h2["rotation_days"] = rot_result.get("days")
@@ -335,9 +363,17 @@ def analyze_rotation_for_field(
 
         # 叩き台パターン
         tataki = detect_tatakidai(hist, current_race_date)
-        h2["tatakidai_flag"] = tataki["flag"]
-        h2["tatakidai_bonus"] = tataki.get("bonus", 0.0)
-        h2["tatakidai_message"] = tataki["message"]
+        # 第36波: 実測で叩き台は人気上位(1-3人気)で -4.8pp の逆効果、人気薄(4-9人気)で
+        # +0.6〜1.2pp の実エッジ → 3人気以内は叩き台ボーナスを無効化（市場が織込済み）
+        _pop_t = pd.to_numeric(h2.get("popularity"), errors="coerce")
+        if pd.notna(_pop_t) and _pop_t <= 3:
+            h2["tatakidai_flag"] = False
+            h2["tatakidai_bonus"] = 0.0
+            h2["tatakidai_message"] = ""
+        else:
+            h2["tatakidai_flag"] = tataki["flag"]
+            h2["tatakidai_bonus"] = tataki.get("bonus", 0.0)
+            h2["tatakidai_message"] = tataki["message"]
 
         # クラス変動
         prev_class = str(hist.iloc[0].get("race_class", "")) if not hist.empty and "race_class" in hist.columns else ""

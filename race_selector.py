@@ -40,10 +40,10 @@ def scan_weekend_races(
     all_races = []
     for date_str in dates:
         if progress_placeholder:
-            progress_placeholder.info(f"📡 {date_str} のレース一覧を取得中...")
+            progress_placeholder.info(f"{date_str} のレース一覧を取得中...")
         races = fetch_today_races(date_str)
         if progress_placeholder:
-            progress_placeholder.info(f"📡 {date_str}：{len(races)}レース取得")
+            progress_placeholder.info(f"{date_str}：{len(races)}レース取得")
         for r in races:
             r["date_str"] = date_str
         all_races.extend(races)
@@ -57,11 +57,11 @@ def scan_weekend_races(
     if race_filter:
         all_races = [r for r in all_races if race_filter(r)]
         if progress_placeholder:
-            progress_placeholder.info(f"🔽 フィルター後：{len(all_races)}レース対象")
+            progress_placeholder.info(f"フィルター後：{len(all_races)}レース対象")
 
     total = min(len(all_races), max_races)
     if progress_placeholder:
-        progress_placeholder.info(f"📋 {total}レースをスキャン開始...")
+        progress_placeholder.info(f"{total}レースをスキャン開始...")
 
     results = []
     error_log = []  # エラーを蓄積してまとめて表示
@@ -72,7 +72,7 @@ def scan_weekend_races(
         if progress_placeholder:
             pct = int((i + 1) / total * 100)
             progress_placeholder.info(
-                f"🔍 スキャン中 {i+1}/{total}件 ({pct}%)  \n"
+                f"スキャン中 {i+1}/{total}件 ({pct}%)  \n"
                 f"「{race_name}」を分析中..."
             )
         try:
@@ -117,7 +117,7 @@ def scan_weekend_races(
         except Exception as _err:
             import traceback
             tb = traceback.format_exc()[-300:]  # 末尾300文字
-            error_log.append(f"❌ {race_name}: {type(_err).__name__}: {str(_err)[:120]}\n{tb}")
+            error_log.append(f"{race_name}: {type(_err).__name__}: {str(_err)[:120]}\n{tb}")
             continue
 
     # エラー・スキップを error_container（消えないコンテナ）に表示
@@ -125,10 +125,10 @@ def scan_weekend_races(
     if _err_target and (error_log or skip_log):
         lines = []
         if error_log:
-            lines.append(f"**❌ 例外エラー {len(error_log)}件:**")
+            lines.append(f"**例外エラー {len(error_log)}件:**")
             lines.extend(error_log[:8])
         if skip_log:
-            lines.append(f"**⚠️ スキップ {len(skip_log)}件:**")
+            lines.append(f"**スキップ {len(skip_log)}件:**")
             lines.extend(skip_log[:8])
         _err_target.warning("\n\n".join(lines))
 
@@ -143,7 +143,7 @@ def scan_weekend_races(
         return pd.DataFrame()
 
     if progress_placeholder:
-        progress_placeholder.success(f"✅ スキャン完了！ {len(results)}レースを分析しました")
+        progress_placeholder.success(f"スキャン完了！ {len(results)}レースを分析しました")
 
     df = pd.DataFrame(results)
     df = df.sort_values("race_score", ascending=False).reset_index(drop=True)

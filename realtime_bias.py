@@ -208,57 +208,65 @@ def apply_realtime_bias(
 # Streamlit UI コンポーネント（app.py から呼び出す）
 # ============================================================
 
+def auto_bias_from_recent_variant(venue: str, surface: str = "芝") -> tuple[str, str]:
+    """第45波: TFJV 直近7日の time_bias / gate_bias / pace_bias から
+    BIAS_TYPES のキーを自動推定して返す。
+    Returns: (bias_type_key, 説明文字列)
+    """
+    try:
+        from track_variant import get_recent_variant
+        rv = get_recent_variant(venue, surface, n_days=7) or {}
+    except Exception:
+        return ("neutral", "TFJVデータ取得失敗")
+    tb = rv.get("time_bias")
+    gb = rv.get("gate_bias")
+    pb = rv.get("pace_bias")
+    summary = rv.get("summary", "")
+
+    # 優先順位: 強い時計バイアス > 強い枠/脚質バイアス > フラット
+    if tb is not None and tb >= 8:
+        return ("speed_track", f"高速馬場({summary})")
+    if tb is not None and tb <= -8:
+        return ("heavy_track", f"時計かかる({summary})")
+    if gb is not None and gb <= -0.10 and pb is not None and pb >= 0.20:
+        return ("inner_speed", f"内枠×先行有利({summary})")
+    if gb is not None and gb >= 0.10 and pb is not None and pb <= -0.20:
+        return ("outer_diff", f"外枠×差し有利({summary})")
+    return ("neutral", f"フラット({summary or '集計データ少'})")
+
+
 def render_bias_input_panel(race_id: str | None = None) -> str:
-    """
-    馬場バイアス入力パネルをレンダリングし、選択されたバイアスタイプを返す。
-    """
-    st.markdown('#### 🌿 当日馬場バイアス')
+    """馬場バイアス入力パネル。TFJV データから自動推定し、必要時のみ手動オーバーライド可能。"""
+    import streamlit as st
+    st.markdown('#### 当日馬場バイアス')
 
-    # Step1: 自動取得
-    auto_condition = {}
-    if race_id:
-        with st.spinner('netkeiba から馬場状態を取得中...'):
-            auto_condition = fetch_track_condition_from_netkeiba(race_id)
-        if auto_condition.get('condition') != '不明':
-            st.success(
-                f"**{auto_condition['venue']} {auto_condition['surface']}** "
-                f"馬場: **{auto_condition['condition']}**（自動取得）"
-            )
+    # 自動推定: 選択された会場の直近7日バイアスから
+    venue = st.session_state.get("venue", "") or ""
+    surface = st.session_state.get("surface", "芝") or "芝"
+    auto_type, auto_desc = ("neutral", "")
+    if venue:
+        auto_type, auto_desc = auto_bias_from_recent_variant(venue, surface)
+        auto_label = BIAS_TYPES.get(auto_type, BIAS_TYPES["neutral"])["label"]
+        st.info(f"🤖 自動推定（直近7日 TFJV 集計）: **{auto_label}** — {auto_desc}")
 
-    # Step2: Xテキスト貼り付け解析
-    with st.expander('📋 X（旧Twitter）の投稿を貼り付けてバイアスを自動解析'):
-        st.caption(
-            'X で「東京 馬場バイアス」「中山 内前有利」などで検索し、'
-            '関連するツイートをコピーしてここに貼り付けてください。'
+    # 手動オーバーライド（必要時のみ）
+    with st.expander("手動でバイアスを上書き（自動推定が外れている場合のみ）", expanded=False):
+        bias_labels = {bt: info['label'] for bt, info in BIAS_TYPES.items() if bt != 'unknown'}
+        keys = list(bias_labels.keys())
+        labels = list(bias_labels.values())
+        try:
+            default_idx = keys.index(auto_type)
+        except ValueError:
+            default_idx = keys.index('neutral')
+        selected_label = st.selectbox(
+            '上書きバイアス',
+            labels,
+            index=default_idx,
+            key='bias_manual_select',
         )
-        pasted_text = st.text_area(
-            'X検索結果・競馬ブログのテキスト',
-            height=120,
-            placeholder='例: 「今日の東京は明らかに内前有利。先行馬が残りまくっている。外差しは全く届かない。」',
-            key='bias_text_input',
-        )
-        if pasted_text:
-            parsed = parse_bias_from_text(pasted_text)
-            if parsed['confidence'] > 0:
-                st.info(
-                    f"解析結果: **{parsed['label']}** "
-                    f"（信頼度 {parsed['confidence']}%、"
-                    f"キーワード: {', '.join(parsed['matched_keywords'][:3])}）"
-                )
-            else:
-                st.warning('バイアスキーワードが検出できませんでした。下で手動選択してください。')
+        override_type = next(bt for bt, info in BIAS_TYPES.items() if info['label'] == selected_label)
+        if override_type != auto_type:
+            st.caption(f"⚠️ 自動推定（{BIAS_TYPES[auto_type]['label']}）を「{selected_label}」で上書きします")
+            return override_type
 
-    # Step3: 手動選択（最終フォールバック）
-    bias_labels = {bt: info['label'] for bt, info in BIAS_TYPES.items()}
-    selected_label = st.selectbox(
-        '馬場バイアスを選択（手動・最終確認）',
-        list(bias_labels.values()),
-        index=list(bias_labels.keys()).index('neutral'),
-        key='bias_manual_select',
-    )
-    selected_type = next(bt for bt, info in BIAS_TYPES.items() if info['label'] == selected_label)
-
-    # テキスト解析結果があればそちらを優先表示
-    if pasted_text and 'parsed' in dir() and parsed.get('confidence', 0) > 50:
-        return parsed['bias_type']
-    return selected_type
+    return auto_type

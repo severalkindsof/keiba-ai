@@ -1,20 +1,28 @@
-name: 週末レースデータ事前取得
+name: "[DEPRECATED] 週末レースデータ事前取得 (TFJV移行で不要)"
+
+# このワークフローは TFJV ベース設計への完全移行で不要になりました。
+# 過去成績データは convert_tfjv.py 経由で tfjv_all.parquet に統合されています。
+# 手動実行のみ可能 (workflow_dispatch)。schedule は無効化済み。
 
 on:
-  schedule:
-    # 毎週火曜 9:00 JST (= 月曜 0:00 UTC) に実行
-    - cron: '0 0 * * 2'
-    # 毎週水曜 9:00 JST (= 火曜 0:00 UTC) にも念のため実行
-    - cron: '0 0 * * 3'
-  workflow_dispatch:  # 手動実行も可能
+  # schedule:
+  #   # 旧: 毎週火曜 9:00 JST に実行 → TFJV移行で不要、毎週失敗メールが出るため無効化 (2026-06-09)
+  #   - cron: '0 0 * * 2'
+  #   - cron: '0 0 * * 3'
+  workflow_dispatch:  # 手動実行のみ可能
 
 jobs:
   prefetch:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # コミット権限
+      contents: write
 
     steps:
+      - name: "[DEPRECATED 警告]"
+        run: |
+          echo "::warning::このワークフローは DEPRECATED です。TFJV ベースに移行済みで不要。"
+          echo "::warning::手動実行された場合のみ動作します。"
+
       - name: Checkout
         uses: actions/checkout@v4
 

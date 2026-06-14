@@ -110,7 +110,9 @@ def calc_running_style(df: pd.DataFrame, horse_name: str) -> str:
                         else int(str(x).strip()) if str(x).strip().isdigit() else None
                     ).dropna()
                 else:
-                    pos = pd.to_numeric(hist[col], errors="coerce").dropna()
+                    # TFJV "5=3" 形式に対応: str.extract で先頭数字のみ取得（pace_analyzer.pyと統一）
+                    _parsed = hist[col].astype(str).str.extract(r"^(\d+)", expand=False)
+                    pos = pd.to_numeric(_parsed, errors="coerce").dropna()
 
                 if len(pos) == 0:
                     continue
@@ -419,7 +421,7 @@ def get_weight_trend(df: pd.DataFrame, horse_name: str, n: int = 10) -> dict:
 
     # 急激な変化への警告
     if abs(last_change) >= 14:
-        label += f" ⚠️ 前走比{last_change:+}kg（急変動）"
+        label += f" 前走比{last_change:+}kg（急変動）"
         bonus = -0.01
     elif last_change >= 6:
         label += f" 前走比{last_change:+}kg（増）"
@@ -1409,12 +1411,15 @@ def analyze_recent_races(
         rank      = pd.to_numeric(row.get("rank"),       errors="coerce")
         pop       = pd.to_numeric(row.get("popularity"), errors="coerce")
         my_3f     = pd.to_numeric(row.get("last_3f"),    errors="coerce")
-        corner_s  = row.get("corner_order", "")
+        corner_s  = row.get("corner_order", "") or row.get("corner4", "")
         track_c   = str(row.get("track_condition", "良"))
         surface_r = str(row.get("surface", ""))
         distance_r = pd.to_numeric(row.get("distance", 0), errors="coerce")
         margin_s  = str(row.get("margin", ""))
         race_class = str(row.get("race_class", ""))
+        finish_time = pd.to_numeric(row.get("finish_time"), errors="coerce")
+        field_size_r = pd.to_numeric(row.get("field_size"), errors="coerce")
+        speed_fig_r  = pd.to_numeric(row.get("speed_figure"), errors="coerce")
 
         signals      = []
         excuse_parts = []
@@ -1508,6 +1513,67 @@ def analyze_recent_races(
         if not pd.isna(my_3f) and my_3f > global_3f_avg + 2.0:
             signals.append(f"上がり{my_3f:.1f}秒（全体平均より{my_3f - global_3f_avg:.1f}秒遅い）")
 
+        # ---- ⑧ PCI（ペース変化指数）：展開との相性 ----
+        # pci > 100 = 後半速い（差し有利ペース）/ pci < 100 = 前半速い（前残りペース）
+        pci_val = None
+        if (not pd.isna(finish_time) and not pd.isna(my_3f)
+                and not pd.isna(distance_r) and distance_r > 600):
+            ft_sec = (finish_time // 1000) * 60 + (finish_time % 1000) / 10
+            last3f_sec = my_3f   # last_3f は秒単位（34.5秒など）、/10 不要
+            early_sec  = ft_sec - last3f_sec
+            early_dist = float(distance_r) - 600.0
+            if early_dist > 0 and last3f_sec > 0:
+                early_pace600 = early_sec / (early_dist / 600)
+                pci_val = (early_pace600 / last3f_sec) * 100
+                pci_val = max(60.0, min(140.0, pci_val))
+
+        # コーナー1番手位置（先行 vs 差し判定）
+        c1_pos = None
+        corners_parsed = _parse_corner_positions(corner_s)
+        if corners_parsed:
+            c1_pos = corners_parsed[0]
+
+        field_s = float(field_size_r) if not pd.isna(field_size_r) else None
+
+        if pci_val is not None and not pd.isna(rank) and field_s:
+            # 差し馬が前残りペースで差し届かず（一変候補度大）
+            if pci_val < 90 and c1_pos is not None and c1_pos > field_s * 0.5 and rank > field_s * 0.4:
+                signals.append(f"前残りペース(PCI={pci_val:.0f})で後方から差し届かず")
+                excuse_parts.append("前残りペースで不発")
+                resume_bonus += 0.022
+            # 先行馬が差し有利ペースで垂れた
+            elif pci_val > 115 and c1_pos is not None and c1_pos <= field_s * 0.4 and rank > field_s * 0.5:
+                signals.append(f"差し有利ペース(PCI={pci_val:.0f})で先行して失速")
+                excuse_parts.append("差し有利ペースで先行失速")
+                resume_bonus += 0.015
+
+        # ---- ⑨ 速度指数乖離（相手強化で凡走）----
+        # 速度指数（speed_figure）は「同条件の標準タイムとの差」
+        # 速度指数が平均的なのに着順が悪い = 相手が強かっただけ
+        if (not pd.isna(speed_fig_r) and not pd.isna(rank) and field_s
+                and speed_fig_r >= -3.0   # 自身のパフォーマンスは悪くない
+                and rank > field_s * 0.45):  # 着順は後半
+            # さらに強い条件: 今回よりランクが高い相手
+            signals.append(f"速度指数{speed_fig_r:+.1f}（自力OK）で{int(rank)}着 → 相手強の可能性")
+            excuse_parts.append("相手強で凡走")
+            resume_bonus += 0.018
+
+        # ---- ⑩ 条件改善チェック（今走との比較） ----
+        def _dist_cat(d):
+            if pd.isna(d): return ""
+            d = int(d)
+            if d <= 1400: return "短距離"
+            if d <= 1800: return "マイル"
+            if d <= 2200: return "中距離"
+            return "長距離"
+
+        if current_distance and not pd.isna(distance_r):
+            if _dist_cat(distance_r) != _dist_cat(current_distance):
+                signals.append(f"前走{_dist_cat(distance_r)}→今走{_dist_cat(current_distance)}（距離変更）")
+                if not excuse_parts:  # 他に言い訳がない場合のみ追加
+                    excuse_parts.append(f"距離変更（{_dist_cat(distance_r)}→{_dist_cat(current_distance)}）")
+                resume_bonus += 0.008
+
         # ---- まとめ文 ----
         excuse = " / ".join(excuse_parts) if excuse_parts else ""
         plus   = " / ".join(plus_parts)   if plus_parts   else ""
@@ -1529,6 +1595,7 @@ def analyze_recent_races(
             "bad_track":      bad_track,
             "class_up":       class_up,
             "close_finish":   close_finish,
+            "pci":            round(pci_val, 1) if pci_val is not None else None,
             "signals":        signals,
             "excuse":         excuse,
             "plus":           plus,
@@ -1547,34 +1614,47 @@ def calc_resume_bonus_from_recent(
     Returns
     -------
     {
-        "total_bonus": float,
-        "summary":     str,
-        "top_excuse":  str,   最も強い言い訳
+        "total_bonus":    float,
+        "summary":        str,
+        "top_excuse":     str,   最も強い言い訳
+        "ippen_candidate": bool  複数の言い訳が重なり一変可能性あり
+        "excuse_flags":   list[str]  前走言い訳フラグ（表示用）
     }
     """
     if not recent_analyses:
-        return {"total_bonus": 0.0, "summary": "", "top_excuse": ""}
+        return {"total_bonus": 0.0, "summary": "", "top_excuse": "",
+                "ippen_candidate": False, "excuse_flags": []}
 
     # 直近3走に絞り、新しいほど重みを高く
     weights = [1.0, 0.7, 0.5]
     total_bonus  = 0.0
     excuse_parts = []
+    excuse_flags = []  # 直近1走の言い訳フラグ（表示用）
 
     for i, race in enumerate(recent_analyses[:3]):
         w = weights[i]
         total_bonus += race["resume_bonus"] * w
         if race["excuse"]:
             excuse_parts.append(f"[{i+1}走前]{race['excuse']}")
+        if i == 0 and race.get("signals"):
+            # UI-4: キーワードフィルターを除去し、全シグナルを excuse_flags として表示
+            excuse_flags = race["signals"][:3]  # 最大3つ（フィルターなし）
 
-    total_bonus = min(total_bonus, 0.06)  # 上限
+    total_bonus = min(total_bonus, 0.07)  # 上限を 0.07 に引き上げ
 
     top_excuse = excuse_parts[0].replace("[1走前]", "") if excuse_parts else ""
     summary = " / ".join(excuse_parts) if excuse_parts else "特記なし"
 
+    # A-5: signalsベースに変更（excuse_partsは空でもsignalsには発火がある場合が多い）
+    # signals >= 1 かつ total_bonus >= 0.02 で一変候補
+    ippen = (len(excuse_flags) >= 1 and total_bonus >= 0.02)
+
     return {
-        "total_bonus": round(total_bonus, 4),
-        "summary":     summary,
-        "top_excuse":  top_excuse,
+        "total_bonus":     round(total_bonus, 4),
+        "summary":         summary,
+        "top_excuse":      top_excuse,
+        "ippen_candidate": ippen,
+        "excuse_flags":    excuse_flags,
     }
 
 
@@ -1643,10 +1723,24 @@ def calc_beaten_strong_horses(
     if hist.empty:
         return empty
 
-    # レース識別キー
-    if "race_id" in hist.columns:
-        race_key = "race_id"
+    # NEW-1: レース識別キーを venue+race_no 方式に変更（date+race_name は重複する）
+    # train_lgbm.py と同じ方式: date + "_" + venue + "_" + race_no
+    if "date" in hist.columns and "venue" in hist.columns and "race_no" in hist.columns:
+        if "_rkey" not in df.columns:
+            df = df.copy()
+            df["_rkey"] = (df["date"].astype(str) + "_"
+                           + df["venue"].astype(str) + "_"
+                           + df["race_no"].astype(str))
+        hist = hist.copy()
+        hist["_rkey"] = (hist["date"].astype(str) + "_"
+                         + hist["venue"].astype(str) + "_"
+                         + hist["race_no"].astype(str))
+        race_key = "_rkey"
     elif "date" in hist.columns and "race_name" in hist.columns:
+        # フォールバック: venue/race_noがない場合は date+race_name（精度低下あり）
+        if "_rkey" not in df.columns:
+            df = df.copy()
+            df["_rkey"] = df["date"].astype(str) + "_" + df["race_name"].astype(str)
         hist = hist.copy()
         hist["_rkey"] = hist["date"].astype(str) + "_" + hist["race_name"].astype(str)
         race_key = "_rkey"
@@ -1668,61 +1762,68 @@ def calc_beaten_strong_horses(
         if pd.isna(my_rank) or my_rank > 5:  # 6着以下は対象外
             continue
 
-        # 1〜3番人気馬で、この馬より着順が悪い馬を探す
-        rivals = race_df[
-            (race_df["horse_name"] != horse_name) &
-            (pd.to_numeric(race_df["popularity"], errors="coerce") <= 3)
-        ].copy()
+        # A-2: 未勝利/新馬戦を除外（弱い1番人気を「強敵撃破」とみなさない）
+        _race_name_str = str(my_rows.iloc[0].get("race_name", ""))
+        if any(kw in _race_name_str for kw in ["未勝利", "新馬"]):
+            continue
 
-        for _, rival in rivals.iterrows():
-            rival_rank = pd.to_numeric(rival.get("rank"), errors="coerce")
-            rival_pop  = int(pd.to_numeric(rival.get("popularity"), errors="coerce"))
+        # NEW-1: 各人気レベル（1・2・3番人気）で最大1頭のみカウント（重複防止）
+        recency = max(0.5, 1.0 - i * 0.05) if recency_weight else 1.0
+        for pop_level in [1, 2, 3]:
+            rivals_pop = race_df[
+                (race_df["horse_name"].str.strip() != horse_name.strip()) &
+                (pd.to_numeric(race_df["popularity"], errors="coerce") == pop_level)
+            ].copy()
+            if rivals_pop.empty:
+                continue
+            # 最も着順が良いライバルのみ対象
+            rivals_pop["_rank_n"] = pd.to_numeric(rivals_pop["rank"], errors="coerce")
+            best_rival = rivals_pop.sort_values("_rank_n").iloc[0]
+            rival_rank = best_rival["_rank_n"]
             if pd.isna(rival_rank):
                 continue
             if my_rank < rival_rank:  # この馬が上回った
-                # 新しさの重み（直近=1.0、古い=0.5）
-                recency = max(0.5, 1.0 - i * 0.05) if recency_weight else 1.0
                 beat_details.append({
                     "race_name":        my_rows.iloc[0].get("race_name", ""),
                     "date":             str(my_rows.iloc[0].get("date", "")),
-                    "beaten_popularity": rival_pop,
+                    "beaten_popularity": pop_level,
                     "our_rank":         int(my_rank),
                     "rival_rank":       int(rival_rank),
                     "recency_weight":   round(recency, 2),
                 })
+                break  # 1レースで最上位の1頭だけカウント
 
     if not beat_details:
         return empty
 
-    # ボーナス計算
-    # 1番人気を下した: +0.025, 2番人気: +0.015, 3番人気: +0.008
-    POP_BONUS = {1: 0.025, 2: 0.015, 3: 0.008}
+    # ボーナス計算（NEW-1: 上限を 0.015 に引き下げ）
+    POP_BONUS = {1: 0.015, 2: 0.008, 3: 0.004}
     total_bonus = 0.0
     for b in beat_details:
         pop = b["beaten_popularity"]
         recency = b["recency_weight"]
-        total_bonus += POP_BONUS.get(pop, 0.005) * recency
+        total_bonus += POP_BONUS.get(pop, 0.003) * recency
 
-    # 上限 +0.04（同一馬で複数回カウントしすぎを防ぐ）
-    total_bonus = min(total_bonus, 0.04)
+    total_bonus = min(total_bonus, 0.015)  # 上限 0.015
 
     # 最も格上の相手
     best_victim_pop = min(b["beaten_popularity"] for b in beat_details)
     best_victim = f"{best_victim_pop}番人気"
 
-    # ラベル
-    beat_count = len(beat_details)
+    # beat_count は重複排除済み件数（上限10）
+    beat_count = min(len(beat_details), 10)
+
     if best_victim_pop == 1:
-        label = f"◎ 1番人気を下した実績あり（{beat_count}回）"
+        label = f"◎ 1番人気撃破（1勝C以上 {beat_count}回）"
     elif best_victim_pop == 2:
-        label = f"○ 2番人気以上を下した実績（{beat_count}回）"
+        label = f"○ 2番人気以上撃破（1勝C以上 {beat_count}回）"
     else:
-        label = f"△ 3番人気以上を下した実績（{beat_count}回）"
+        label = f"△ 3番人気以上撃破（1勝C以上 {beat_count}回）"
 
     return {
         "beat_count":   beat_count,
         "best_victim":  best_victim,
-        "beat_details": beat_details[:5],  # 最大5件
+        "beat_details": beat_details[:5],
         "bonus":        round(total_bonus, 4),
         "label":        label,
     }

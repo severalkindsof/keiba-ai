@@ -1,0 +1,22 @@
+[theme]
+base = "dark"
+primaryColor = "#E0633F"
+backgroundColor = "#211D19"
+secondaryBackgroundColor = "#2B2622"
+textColor = "#F2EDE2"
+linkColor = "#E8825F"
+borderColor = "#423B32"
+dataframeBorderColor = "#423B32"
+dataframeHeaderBackgroundColor = "#272320"
+codeBackgroundColor = "#272320"
+showWidgetBorder = true
+showSidebarBorder = true
+baseRadius = "0.75rem"
+font = "Noto Serif JP, 'Yu Mincho', 'Hiragino Mincho ProN', serif"
+headingFont = "Noto Serif JP, 'Yu Mincho', 'Hiragino Mincho ProN', serif"
+codeFont = "Noto Serif JP, 'Yu Mincho', serif"
+chartCategoricalColors = ["#E0633F", "#6FA77F", "#C9A35C", "#D9604F", "#B8AFA0", "#7A8CA3"]
+
+[theme.sidebar]
+backgroundColor = "#272320"
+secondaryBackgroundColor = "#211D19"
